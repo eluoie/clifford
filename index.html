@@ -469,6 +469,115 @@ body {
   throw new Error('input-mode');
 })();
 
+// ── Audio Engine ──────────────────────────────────────────────────────────────
+const _audio = (() => {
+  let ctx = null, master = null, reverb = null, ambStarted = false;
+
+  // Pentatonic minor of A over two octaves (semitones from A2 = 110 Hz)
+  const PENTA = [0, 3, 5, 7, 10, 12, 15, 17, 19, 22];
+  function stToHz(st) { return 110 * Math.pow(2, st / 12); }
+  function hashToHz(hash) { return stToHz(PENTA[Math.abs(hash) % PENTA.length]); }
+
+  function makeReverb(c) {
+    const conv = c.createConvolver();
+    const sr = c.sampleRate, len = sr * 5.5;
+    const buf = c.createBuffer(2, len, sr);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = buf.getChannelData(ch);
+      for (let i = 0; i < len; i++)
+        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 1.9);
+    }
+    conv.buffer = buf;
+    return conv;
+  }
+
+  function init() {
+    if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    master = ctx.createGain(); master.gain.value = 0.72; master.connect(ctx.destination);
+    reverb = makeReverb(ctx);
+    const revG = ctx.createGain(); revG.gain.value = 0.58;
+    reverb.connect(revG); revG.connect(master);
+    _startAmbient();
+  }
+
+  function _startAmbient() {
+    if (ambStarted || !ctx) return;
+    ambStarted = true;
+    const now = ctx.currentTime;
+    // Open 5ths + octaves drone — A1 E2 A2 E3 A3, each slightly detuned for chorus
+    const drones = [
+      [55,    0], [55,   -8],
+      [82.5,  5], [82.5, -5],
+      [110,   0], [110,   7],
+      [165,  -3], [165,   3],
+      [220,   0],
+    ];
+    drones.forEach(([freq, detune], i) => {
+      const osc = ctx.createOscillator(); osc.type = 'sine';
+      osc.frequency.value = freq; osc.detune.value = detune;
+      const g = ctx.createGain();
+      const peak = 0.052 * (1 / (1 + i * 0.4));
+      // Slow amplitude LFO per partial
+      const lfo = ctx.createOscillator(); lfo.type = 'sine';
+      lfo.frequency.value = 0.038 + i * 0.008;
+      const lfoG = ctx.createGain(); lfoG.gain.value = peak * 0.28;
+      lfo.connect(lfoG); lfoG.connect(g.gain);
+      g.gain.setValueAtTime(0, now);
+      g.gain.linearRampToValueAtTime(peak, now + 7 + i * 1.8);
+      osc.connect(g); g.connect(reverb); g.connect(master);
+      osc.start(now); lfo.start(now);
+    });
+    // Soft breathe — bandpass noise
+    const nLen = ctx.sampleRate * 3;
+    const nBuf = ctx.createBuffer(1, nLen, ctx.sampleRate);
+    const nd = nBuf.getChannelData(0);
+    for (let i = 0; i < nLen; i++) nd[i] = Math.random() * 2 - 1;
+    const ns = ctx.createBufferSource(); ns.buffer = nBuf; ns.loop = true;
+    const nf = ctx.createBiquadFilter(); nf.type = 'bandpass'; nf.frequency.value = 175; nf.Q.value = 0.35;
+    const ng = ctx.createGain(); ng.gain.value = 0;
+    ng.gain.linearRampToValueAtTime(0.007, now + 18);
+    ns.connect(nf); nf.connect(ng); ng.connect(reverb); ns.start();
+  }
+
+  function playSpawn(hash) {
+    if (!ctx || ctx.state !== 'running') return;
+    const freq = hashToHz(hash), now = ctx.currentTime;
+    // Crystal bell: inharmonic partials with individual decays
+    [[1, 0.50, 4.2], [2, 0.22, 2.6], [3.01, 0.11, 1.6], [4.2, 0.06, 0.9]].forEach(([r, amp, dec]) => {
+      const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = freq * r;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, now);
+      g.gain.linearRampToValueAtTime(amp * 0.11, now + 0.016);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + dec);
+      o.connect(g); g.connect(reverb); g.connect(master);
+      o.start(now); o.stop(now + dec + 0.1);
+    });
+  }
+
+  function playClash(hashA, hashB) {
+    if (!ctx || ctx.state !== 'running') return;
+    const fA = hashToHz(hashA), fB = hashToHz(hashB);
+    const fMid = fA * Math.sqrt(fB / fA); // geometric mean — always harmonic
+    const now = ctx.currentTime;
+    [fA, fB, fMid].forEach((freq, i) => {
+      const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = freq;
+      const g = ctx.createGain();
+      const amp = [0.13, 0.10, 0.08][i];
+      g.gain.setValueAtTime(0, now);
+      g.gain.linearRampToValueAtTime(amp, now + 0.04);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + 3.8);
+      o.connect(g); g.connect(reverb);
+      o.start(now); o.stop(now + 4.0);
+    });
+  }
+
+  document.addEventListener('click',   init, false);
+  document.addEventListener('keydown', init, { once: true });
+
+  return { init, playSpawn, playClash };
+})();
+
 // ── Renderer ──────────────────────────────────────────────────────────────────
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -1382,6 +1491,7 @@ function checkTouches() {
       if (a.center.distanceTo(b.center) > 6.5) continue;
       a.markTouched(); b.markTouched();
       a.flash(); b.flash();
+      _audio.playClash(a.sig.hash, b.sig.hash);
       const mid = a.center.clone().add(b.center).multiplyScalar(0.5);
       clashBursts.push(new ClashBurst(mid, a.sig.color, b.sig.color));
       collisionLabels.push(new CollisionLabel(a.center, b.center, a.name, a.sig.hex, b.name, b.sig.hex));
@@ -1443,6 +1553,8 @@ async function spawnName(name) {
   const id   = nameIdCnt++;
   const wave = new NameWave(name, id, true);
   nameWaves.push(wave);
+  _audio.init();
+  _audio.playSpawn(wave.sig.hash);
   
 
   // Overlay runs AFTER — wave already visible behind it
