@@ -1481,7 +1481,7 @@ async function spawnName(name) {
     }
   } catch(_) {}
   const _saved = loadSaved();
-  const _toLoad = _saved.length ? _saved.slice(-8) : ['RESONANZ','CLIFFORD','BERLIN','UYEN','KOSMOS'];
+  const _toLoad = _saved.length ? _saved.slice(-8) : [];
   _toLoad.forEach(n => { nameWaves.push(new NameWave(n, nameIdCnt++, true)); });
 })();
 
@@ -1800,7 +1800,7 @@ function resetSession() {
       w.cloud2.geometry.attributes.position.needsUpdate = true;
       nameWaves.push(w);
     } else {
-      ['RESONANZ','CLIFFORD','BERLIN','UYEN','KOSMOS'].forEach(n => nameWaves.push(new NameWave(n, nameIdCnt++, true)));
+      // no default attractors — start empty
     }
   }
 }
