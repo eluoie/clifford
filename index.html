@@ -219,6 +219,10 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
     font-size:9px; letter-spacing:0.5em; text-transform:uppercase;
     color:rgba(255,255,255,0.3); font-weight:300;
   }
+  #ip-desc {
+    font-size:11px; font-weight:300; line-height:1.7;
+    color:rgba(255,255,255,0.35); text-align:center; max-width:280px;
+  }
   #ip-field {
     width:100%; background:rgba(255,255,255,0.05);
     border:1px solid rgba(255,255,255,0.12); border-radius:14px;
@@ -243,7 +247,8 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
 </style>
 <div id="ip-wrap">
   <div id="ip-title">Clifford Universe</div>
-  <input id="ip-field" type="text" placeholder="Your name" maxlength="18"
+  <div id="ip-desc">Any word you enter is run through a djb2 hash function, generating a unique integer that maps to an HSL color and seeds four Clifford attractor parameters, producing a unique shape that exists for that word alone.</div>
+  <input id="ip-field" type="text" placeholder="Your Clifford" maxlength="18"
          autocomplete="off" spellcheck="false" autofocus>
   <button id="ip-btn">Send</button>
   <div id="ip-status"></div>
