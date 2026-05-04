@@ -158,7 +158,7 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
 /* ── Session timer (top-centre) ───────────────────────────────────────────── */
 #timer-el {
   position: fixed; top: 28px; left: 50%; transform: translateX(-50%);
-  z-index: 30; display: none; text-align: center; pointer-events: none;
+  z-index: 30; display: block; text-align: center; pointer-events: none;
   white-space: nowrap;
 }
 #timer-el .t-label {
@@ -167,9 +167,22 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
 }
 #timer-el .t-value {
   font-size: 26px; font-weight: 200; letter-spacing: 0.35em; font-family: monospace;
-  color: rgba(255,255,255,0.75);
+  color: rgba(255,255,255,0.75); transition: color 0.6s ease;
 }
-#timer-el.urgent .t-value { color: rgba(255,90,90,0.9); }
+#timer-el.urgent .t-value { color: rgba(255,60,60,1); }
+
+/* ── Decision overlay ──────────────────────────────────────────────────────── */
+#decision-overlay {
+  position: fixed; inset: 0; z-index: 42; pointer-events: none;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity 0.5s ease;
+}
+#decision-overlay.visible { opacity: 1; }
+#decision-word {
+  font-size: 18vw; font-weight: 100; letter-spacing: 0.12em;
+  text-transform: uppercase; font-family: monospace;
+  line-height: 1; text-align: center;
+}
 
 
 /* ── Info overlay boxes ───────────────────────────────────────────────────── */
@@ -250,6 +263,9 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
 
 <!-- ── Info overlay boxes ────────────────────────────────────────────────── -->
 <div id="info-box"><p id="info-text"><span class="info-cursor"></span></p></div>
+
+<!-- ── Decision overlay ──────────────────────────────────────────────────── -->
+<div id="decision-overlay"><span id="decision-word"></span></div>
 
 <!-- ── White flash ───────────────────────────────────────────────────────── -->
 <div id="white-flash"></div>
@@ -1674,13 +1690,21 @@ function fmtRemaining(s) {
 function updateSessionTimerEl(remaining) {
   const el = document.getElementById('timer-el');
   if (!el) return;
-  if (remaining <= 30) {
-    el.style.display = 'block';
-    document.getElementById('timer-value-el').textContent = fmtRemaining(remaining);
-    el.classList.toggle('urgent', remaining <= 10);
-  } else {
-    el.style.display = 'none';
-  }
+  document.getElementById('timer-value-el').textContent = fmtRemaining(remaining);
+  el.classList.toggle('urgent', remaining <= 30);
+}
+
+function showDecisionOverlay() {
+  const word  = votesDie >= votesLive ? 'PURGE' : 'MERGE';
+  const color = votesDie >= votesLive ? 'rgba(180,40,255,0.92)' : 'rgba(0,210,255,0.92)';
+  const ov = document.getElementById('decision-overlay');
+  const dw = document.getElementById('decision-word');
+  if (!ov || !dw) return;
+  dw.textContent  = word;
+  dw.style.color  = color;
+  dw.style.textShadow = `0 0 120px ${color}, 0 0 240px ${color}`;
+  ov.classList.add('visible');
+  setTimeout(() => { ov.classList.remove('visible'); }, 5000);
 }
 
 
@@ -1695,6 +1719,7 @@ function broadcastSessionState() {
 function handlePhaseChange(from, to) {
   if (to === 'lockout' || to === 'chaos') {
     updateSessionTimerEl(300 - sessionElapsed);
+    if (to === 'chaos') showDecisionOverlay();
   }
   if (to === 'result' && !resultExecuted) {
     resultExecuted = true;
@@ -2138,6 +2163,7 @@ function resetSession() {
   _infoIdx = 0; _infoTransitioning = false;
   if (_infoFadeOutTimer) { clearTimeout(_infoFadeOutTimer); _infoFadeOutTimer = null; }
   const _ib = document.getElementById('info-box'); if (_ib) _ib.classList.remove('info-visible');
+  const _do = document.getElementById('decision-overlay'); if (_do) _do.classList.remove('visible');
   updateSessionTimerEl(300);
 
   if (sw) {
