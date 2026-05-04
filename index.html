@@ -271,27 +271,68 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
   document.body.innerHTML = `
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
-body { background:#000; color:#fff; min-height:100dvh; font-family:'Helvetica Neue',Helvetica,sans-serif; display:flex; align-items:center; justify-content:center; }
-#ip-wrap { display:flex; flex-direction:column; align-items:center; gap:22px; padding:48px 28px; width:100%; max-width:360px; }
-.ip-title { font-size:9px; letter-spacing:0.5em; text-transform:uppercase; color:rgba(255,255,255,0.3); }
-.ip-desc { font-size:11px; font-weight:300; line-height:1.7; color:rgba(255,255,255,0.35); text-align:center; }
-#ip-field { width:100%; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12); border-radius:14px; padding:18px 22px; font-size:20px; font-weight:200; letter-spacing:0.3em; text-transform:uppercase; color:#fff; outline:none; text-align:center; transition:border-color 0.2s; }
-#ip-field:focus { border-color:rgba(255,255,255,0.35); }
-#ip-field::placeholder { font-size:11px; letter-spacing:0.2em; color:rgba(255,255,255,0.18); }
-.ip-fate-label { font-size:8px; letter-spacing:0.4em; text-transform:uppercase; color:rgba(255,255,255,0.25); text-align:center; line-height:1.7; width:100%; }
-.ip-choices { display:flex; flex-direction:column; gap:10px; width:100%; }
-.ip-choice { width:100%; cursor:pointer; display:flex; align-items:flex-start; gap:14px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07); border-radius:12px; padding:16px 14px; transition:border-color 0.2s, background 0.2s; }
-.ip-choice.selected { border-color:rgba(255,255,255,0.3); background:rgba(255,255,255,0.07); }
-.ip-radio { width:15px; height:15px; min-width:15px; border-radius:50%; border:1px solid rgba(255,255,255,0.25); margin-top:2px; display:flex; align-items:center; justify-content:center; transition:border-color 0.2s, background 0.2s; }
+body {
+  background:#000; color:#fff; min-height:100dvh;
+  font-family:'Helvetica Neue',Helvetica,sans-serif;
+  display:flex; flex-direction:column; align-items:center;
+  padding:56px 24px 40px;
+}
+#ip-wrap { width:100%; max-width:448px; display:flex; flex-direction:column; gap:40px; }
+#ip-entry { display:flex; flex-direction:column; gap:40px; }
+.ip-header { display:flex; flex-direction:column; align-items:center; gap:12px; }
+.ip-site-title { font-size:10px; letter-spacing:0.5em; text-transform:uppercase; color:rgba(255,255,255,0.3); text-align:center; }
+.ip-site-desc { font-size:14px; font-weight:300; line-height:1.7; color:rgba(255,255,255,0.55); text-align:center; max-width:288px; }
+#ip-card {
+  border-radius:16px; padding:28px 24px; display:flex; flex-direction:column;
+  align-items:center; gap:12px; background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.1); transition:box-shadow 0.3s, border-color 0.3s;
+}
+#ip-card.active { border-color:transparent; box-shadow:0 0 0 1.5px hsl(var(--wh),var(--ws),var(--wl)); }
+.ip-card-label { font-size:10px; letter-spacing:0.5em; text-transform:uppercase; color:rgba(255,255,255,0.3); }
+#ip-field {
+  width:100%; background:transparent; border:0; outline:none; text-align:center;
+  letter-spacing:0.35em; font-size:30px; font-weight:200; text-transform:uppercase; color:#fff;
+}
+#ip-field.has-word { color:hsl(var(--wh),var(--ws),var(--wl)); }
+#ip-field::placeholder { font-size:11px; letter-spacing:0.2em; color:rgba(255,255,255,0.25); font-weight:300; }
+.ip-color-hint { font-size:10px; letter-spacing:0.3em; font-family:monospace; color:rgba(255,255,255,0.3); height:14px; text-align:center; }
+.ip-fate-row {
+  display:flex; align-items:center; justify-content:center; gap:12px;
+  font-size:11px; letter-spacing:0.4em; text-transform:uppercase; color:rgba(255,255,255,0.3);
+}
+.ip-fate-dot { width:4px; height:4px; border-radius:50%; background:rgba(255,255,255,0.25); flex-shrink:0; }
+#ip-timer-inline { font-family:monospace; transition:color 0.3s; }
+#ip-timer-inline.has-word { color:hsl(var(--wh),var(--ws),var(--wl)); }
+.ip-choices { display:flex; flex-direction:column; gap:12px; }
+.ip-choice {
+  cursor:pointer; display:flex; align-items:center; gap:16px;
+  border-radius:16px; border:1px solid rgba(255,255,255,0.1); padding:20px;
+  background:rgba(255,255,255,0.02); transition:border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+.ip-choice:hover:not(.selected) { background:rgba(255,255,255,0.05); }
+.ip-choice.selected { background:rgba(255,255,255,0.06); border-color:rgba(255,255,255,0.4); }
+.ip-choice.selected.has-word { border-color:transparent; box-shadow:0 0 0 1.5px hsl(var(--wh),var(--ws),var(--wl)); }
+.ip-radio {
+  width:16px; height:16px; min-width:16px; border-radius:50%;
+  border:1px solid rgba(255,255,255,0.3); display:flex; align-items:center; justify-content:center;
+  flex-shrink:0; transition:border-color 0.2s, background 0.2s;
+}
 .ip-choice.selected .ip-radio { border-color:#fff; background:#fff; }
-.ip-radio-dot { width:5px; height:5px; border-radius:50%; background:#000; opacity:0; transition:opacity 0.15s; }
+.ip-choice.selected.has-word .ip-radio { background:hsl(var(--wh),var(--ws),var(--wl)); border-color:hsl(var(--wh),var(--ws),var(--wl)); }
+.ip-radio-dot { width:6px; height:6px; border-radius:50%; background:#000; opacity:0; transition:opacity 0.15s; }
 .ip-choice.selected .ip-radio-dot { opacity:1; }
-.ip-choice-title { font-size:11px; letter-spacing:0.4em; text-transform:uppercase; margin-bottom:5px; }
-.ip-choice-desc { font-size:11px; font-weight:300; line-height:1.6; color:rgba(255,255,255,0.38); }
-#ip-send-btn { width:100%; padding:16px; border-radius:14px; border:none; background:#fff; color:#000; font-size:11px; letter-spacing:0.4em; text-transform:uppercase; cursor:pointer; transition:opacity 0.15s; }
-#ip-send-btn:active { opacity:0.8; }
-#ip-send-btn:disabled { opacity:0.3; cursor:default; }
-/* After-vote screen */
+.ip-choice-texts { display:flex; flex-direction:column; gap:2px; }
+.ip-choice-title { font-size:14px; letter-spacing:0.35em; text-transform:uppercase; }
+.ip-choice-sub { font-size:12px; font-weight:300; line-height:1.5; color:rgba(255,255,255,0.4); }
+#ip-send-btn {
+  width:100%; padding:18px; border-radius:16px; border:none;
+  background:#fff; color:#000; font-size:11px; letter-spacing:0.4em;
+  text-transform:uppercase; cursor:pointer; font-weight:500; transition:opacity 0.15s;
+}
+#ip-send-btn:hover:not(:disabled) { opacity:0.9; }
+#ip-send-btn:active:not(:disabled) { opacity:0.8; }
+#ip-send-btn:disabled { opacity:0.25; cursor:default; }
+/* After vote */
 #ip-voted { display:none; flex-direction:column; align-items:center; gap:28px; width:100%; }
 .ip-timer-row { font-size:8px; letter-spacing:0.4em; text-transform:uppercase; font-family:monospace; color:rgba(255,255,255,0.2); text-align:center; }
 .ip-timer-val { color:rgba(255,255,255,0.55); }
@@ -301,52 +342,103 @@ body { background:#000; color:#fff; min-height:100dvh; font-family:'Helvetica Ne
 .ip-lockout { font-size:9px; letter-spacing:0.35em; text-transform:uppercase; color:rgba(255,90,90,0.5); text-align:center; font-family:monospace; }
 </style>
 <div id="ip-wrap">
-  <!-- Entry + vote on one screen -->
-  <div id="ip-entry" style="display:flex;flex-direction:column;align-items:center;gap:22px;width:100%">
-    <div class="ip-title">Clifford Universe</div>
-    <div class="ip-desc">Any word you enter is run through a djb2 hash function, generating a unique integer that maps to an HSL color and seeds four Clifford attractor parameters, producing a unique shape that exists for that word alone.</div>
-    <input id="ip-field" type="text" placeholder="Your Clifford" maxlength="18" autocomplete="off" spellcheck="false" autofocus>
-    <div class="ip-fate-label">Session will reset in <span class="ip-timer-val" id="ip-t0">—</span><br>Determine the fate of your Clifford Attractor:</div>
+  <div id="ip-entry">
+    <header class="ip-header">
+      <p class="ip-site-title">CLIFFORD UNIVERSE</p>
+      <p class="ip-site-desc">Enter a word to shape your universe.</p>
+    </header>
+    <section id="ip-card">
+      <label class="ip-card-label" for="ip-field">YOUR WORD</label>
+      <input id="ip-field" type="text" placeholder="TYPE HERE" maxlength="16" autocomplete="off" spellcheck="false" autofocus>
+      <div id="ip-color-hint" class="ip-color-hint">&nbsp;</div>
+    </section>
+    <div class="ip-fate-row">
+      <span>CHOOSE ITS FATE</span>
+      <span class="ip-fate-dot"></span>
+      <span id="ip-timer-inline">—</span>
+    </div>
     <div class="ip-choices">
       <div class="ip-choice" data-val="die">
         <div class="ip-radio"><div class="ip-radio-dot"></div></div>
-        <div><div class="ip-choice-title">Die as One</div><div class="ip-choice-desc">Go out as a single spark. Own your void and leave no trace.</div></div>
+        <div class="ip-choice-texts">
+          <span class="ip-choice-title">DIE AS ONE</span>
+          <span class="ip-choice-sub">A single spark. No trace.</span>
+        </div>
       </div>
       <div class="ip-choice" data-val="live">
         <div class="ip-radio"><div class="ip-radio-dot"></div></div>
-        <div><div class="ip-choice-title">Live as All</div><div class="ip-choice-desc">Transcend within the collective nebula and live through the next session.</div></div>
+        <div class="ip-choice-texts">
+          <span class="ip-choice-title">LIVE AS ALL</span>
+          <span class="ip-choice-sub">Transcend into the nebula.</span>
+        </div>
       </div>
     </div>
-    <button id="ip-send-btn" disabled>Send</button>
+    <button id="ip-send-btn" disabled>SEND</button>
   </div>
-  <!-- After vote -->
   <div id="ip-voted">
-    <div class="ip-title">Clifford Universe</div>
-    <div class="ip-timer-row">Session will reset in <span class="ip-timer-val" id="ip-t1">—</span></div>
+    <div class="ip-site-title">Clifford Universe</div>
+    <div class="ip-timer-row">session will reset in <span class="ip-timer-val" id="ip-t1">—</span></div>
     <div class="ip-split-bar"><div id="ip-split-a" class="ip-split-a" style="width:50%"></div><div class="ip-split-b"></div></div>
     <div id="ip-lockout-msg"></div>
   </div>
 </div>`;
 
+  // djb2 hash + HSL→hex (matches display side)
+  function djb2(str) { let h=5381; for(let i=0;i<str.length;i++) h=((h<<5)+h+str.charCodeAt(i))>>>0; return h; }
+  function hslToHex(h,s,l) {
+    s/=100; l/=100;
+    const k=n=>(n+h/30)%12, a=s*Math.min(l,1-l);
+    const f=n=>l-a*Math.max(-1,Math.min(k(n)-3,Math.min(9-k(n),1)));
+    const x=n=>Math.round(f(n)*255).toString(16).padStart(2,'0');
+    return ('#'+x(0)+x(8)+x(4)).toUpperCase();
+  }
+
   let selectedVote = null;
   function fmtT(s) { s=Math.max(0,Math.ceil(s)); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
 
-  // Vote selection — enable Send only when both field and vote are ready
+  function updateWordStyle() {
+    const val = (document.getElementById('ip-field').value||'').trim();
+    const hasWord = val.length > 0;
+    if (hasWord) {
+      const h = djb2(val.toLowerCase());
+      const hue = h % 360, sat = 65+(h%25), light = 55+((h>>8)%12);
+      document.body.style.setProperty('--wh', hue);
+      document.body.style.setProperty('--ws', sat+'%');
+      document.body.style.setProperty('--wl', light+'%');
+      const hint = document.getElementById('ip-color-hint');
+      if (hint) hint.textContent = hslToHex(hue,sat,light)+' \u00B7 h '+hue+'\u00B0 \u00B7 s '+sat+'%';
+      document.getElementById('ip-field').classList.add('has-word');
+      document.getElementById('ip-card').classList.add('active');
+      document.getElementById('ip-timer-inline').classList.add('has-word');
+      document.querySelectorAll('.ip-choice.selected').forEach(c => c.classList.add('has-word'));
+    } else {
+      const hint = document.getElementById('ip-color-hint');
+      if (hint) hint.innerHTML = '&nbsp;';
+      document.getElementById('ip-field').classList.remove('has-word');
+      document.getElementById('ip-card').classList.remove('active');
+      document.getElementById('ip-timer-inline').classList.remove('has-word');
+      document.querySelectorAll('.ip-choice').forEach(c => c.classList.remove('has-word'));
+    }
+    checkReady();
+  }
+
   function checkReady() {
     const word = (document.getElementById('ip-field').value||'').trim();
     document.getElementById('ip-send-btn').disabled = !(word && selectedVote);
   }
-  document.getElementById('ip-field').addEventListener('input', checkReady);
+
+  document.getElementById('ip-field').addEventListener('input', updateWordStyle);
   document.querySelectorAll('.ip-choice').forEach(el => {
     el.addEventListener('click', () => {
-      document.querySelectorAll('.ip-choice').forEach(c => c.classList.remove('selected'));
+      document.querySelectorAll('.ip-choice').forEach(c => c.classList.remove('selected','has-word'));
       el.classList.add('selected');
+      const hasWord = (document.getElementById('ip-field').value||'').trim().length > 0;
+      if (hasWord) el.classList.add('has-word');
       selectedVote = el.dataset.val;
       checkReady();
     });
   });
 
-  // Send: publish word + vote together, then show bar
   document.getElementById('ip-send-btn').addEventListener('click', () => {
     const word = (document.getElementById('ip-field').value||'').trim();
     if (!word || !selectedVote) return;
@@ -368,10 +460,10 @@ body { background:#000; color:#fff; min-height:100dvh; font-family:'Helvetica Ne
       try {
         const st = JSON.parse(buf.toString());
         const fmt = fmtT(st.timer||0);
-        const t0=document.getElementById('ip-t0'), t1=document.getElementById('ip-t1');
-        if(t0) t0.textContent=fmt; if(t1) t1.textContent=fmt;
+        const ti=document.getElementById('ip-timer-inline'), t1=document.getElementById('ip-t1');
+        if(ti) ti.textContent=fmt; if(t1) t1.textContent=fmt;
         if(st.die!==undefined) {
-          const tot=st.die+st.live||1;
+          const tot=(st.die+st.live)||1;
           const bar=document.getElementById('ip-split-a');
           if(bar) bar.style.width=(st.die/tot*100)+'%';
         }
