@@ -1697,84 +1697,197 @@ function handlePhaseChange(from, to) {
   if (to === 'flash') doWhiteFlash();
 }
 
-// DIE AS ONE — glorious firework explosions
+// PURGE — particle explosion per attractor
 async function runDieAsOne() {
-  // No survivor
   localStorage.removeItem('clf-survivor');
   survivorWave = null;
+  sessionChaosSpeed = 18;
 
-  // Keep chaos roaring throughout result phase
-  sessionChaosSpeed = 14;
-
-  // Full-screen word overlay
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:50;display:flex;align-items:center;justify-content:center;';
   document.body.appendChild(overlay);
   const wordEl = document.createElement('div');
-  wordEl.style.cssText = 'font-weight:200;letter-spacing:0.38em;text-transform:uppercase;font-family:monospace;opacity:0;text-align:center;padding:0 5vw;box-sizing:border-box;white-space:nowrap;';
+  wordEl.style.cssText = 'font-weight:200;letter-spacing:0.38em;text-transform:uppercase;font-family:monospace;opacity:0;text-align:center;padding:0 5vw;box-sizing:border-box;white-space:nowrap;will-change:transform,opacity;';
   overlay.appendChild(wordEl);
 
   const waves = [...nameWaves];
   for (const w of waves) {
     if (w.dead) continue;
 
-    // Style word in wave's color
     const hex = '#' + w.sig.color.getHexString();
     wordEl.textContent = w.name;
     wordEl.style.color = hex;
+    wordEl.style.textShadow = `0 0 60px ${hex}, 0 0 130px ${hex}, 0 0 240px ${hex}`;
     wordEl.style.fontSize = '120px';
-    wordEl.style.opacity = '1';
-    // Shrink to fit screen width
+    wordEl.style.opacity  = '1';
+    wordEl.style.transform = 'scale(1)';
     let fs = 120;
     while (fs > 8 && wordEl.scrollWidth > window.innerWidth * 0.9) { fs -= 2; wordEl.style.fontSize = fs + 'px'; }
     wordEl.style.opacity = '0';
-    wordEl.style.textShadow = `0 0 40px ${hex}, 0 0 80px ${hex}, 0 0 160px ${hex}`;
 
-    // Explode attractor + fade in word simultaneously
-    let fadeDone = false;
-    const fadePromise = new Promise(res => {
-      const t0 = Date.now();
-      const iv = setInterval(() => {
-        const p = Math.min((Date.now() - t0) / 500, 1);
-        wordEl.style.opacity = p;
-        if (p >= 1) { clearInterval(iv); fadeDone = true; res(); }
-      }, 16);
-    });
-
-    await new Promise(resolve => {
-      let t = 0;
-      const iv = setInterval(() => {
-        t += 0.016;
-        const p = Math.min(t / 1.6, 1);
-        // Expand to fill screen
-        w.group.scale.setScalar(1 + p * 36);
-        // Brightness: spikes at 40% then fades
-        const bright = p < 0.4 ? p / 0.4 : Math.max(0, 1 - (p - 0.4) / 0.6);
-        w.mat.opacity    = 0.9 * bright;
-        w.mat2.opacity   = 0.5 * bright;
-        w.orbMat.opacity = 0.3 * bright;
-        // Keep chaos speed up
-        sessionChaosSpeed = 12 + bright * 8;
-        if (p >= 1) { clearInterval(iv); w.dead = true; resolve(); }
-      }, 16);
-    });
-
-    // Hold word briefly then fade out
-    await new Promise(r => setTimeout(r, 400));
-    await new Promise(res => {
-      const t0 = Date.now();
-      const iv = setInterval(() => {
-        const p = Math.min((Date.now() - t0) / 600, 1);
-        wordEl.style.opacity = 1 - p;
-        if (p >= 1) { clearInterval(iv); res(); }
-      }, 16);
-    });
-    await new Promise(r => setTimeout(r, 150));
+    await purgeBurst(w, wordEl);
+    await new Promise(r => setTimeout(r, 220));
   }
 
   overlay.remove();
-  // Keep chaos speed elevated until white flash
-  sessionChaosSpeed = 14;
+  sessionChaosSpeed = 18;
+}
+
+async function purgeBurst(wave, wordEl) {
+  const N_FINE  = 4500; // small dense particles
+  const N_GLOW  = 900;  // large bloom particles
+  const srcArr  = wave.cloud.geometry.attributes.position.array;
+  const srcN    = srcArr.length / 3;
+
+  // World-space transform of wave group
+  wave.group.updateMatrixWorld(true);
+  const m  = wave.group.matrixWorld.elements;
+  const cx = m[12], cy = m[13], cz = m[14];
+
+  // ── Allocate particle buffers (fine + glow share same positions) ─────────
+  const positions  = new Float32Array(N_FINE * 3);
+  const velocities = new Float32Array(N_FINE * 3);
+  const glowPos    = new Float32Array(N_GLOW * 3);
+  const glowVel    = new Float32Array(N_GLOW * 3);
+
+  function fillParticles(pos, vel, N, speedMult) {
+    for (let i = 0; i < N; i++) {
+      const si = Math.floor(Math.random() * srcN) * 3;
+      const lx = srcArr[si], ly = srcArr[si+1], lz = srcArr[si+2];
+      // Local → world
+      const wx = m[0]*lx + m[4]*ly + m[8]*lz  + m[12];
+      const wy = m[1]*lx + m[5]*ly + m[9]*lz  + m[13];
+      const wz = m[2]*lx + m[6]*ly + m[10]*lz + m[14];
+      pos[i*3] = wx; pos[i*3+1] = wy; pos[i*3+2] = wz;
+
+      // Radial direction from wave center + scatter
+      const dx = wx - cx, dy = wy - cy, dz = wz - cz;
+      const len = Math.sqrt(dx*dx + dy*dy + dz*dz) || 1;
+      // Bimodal speed: 40% fast streakers, 60% drifters
+      const speed = (Math.random() < 0.4
+        ? 5 + Math.random() * 10
+        : 0.4 + Math.random() * 4) * speedMult;
+      const sc = 0.45 + Math.random() * 0.55;
+      vel[i*3]   = dx/len * speed + (Math.random()-0.5) * sc * speed;
+      vel[i*3+1] = dy/len * speed + (Math.random()-0.5) * sc * speed;
+      vel[i*3+2] = dz/len * speed + (Math.random()-0.5) * sc * speed;
+    }
+  }
+
+  fillParticles(positions, velocities, N_FINE, 1.0);
+  fillParticles(glowPos,   glowVel,   N_GLOW, 0.7);
+
+  const geoFine = new THREE.BufferGeometry();
+  geoFine.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const geoGlow = new THREE.BufferGeometry();
+  geoGlow.setAttribute('position', new THREE.BufferAttribute(glowPos,   3));
+
+  const ADDV = { transparent: true, blending: THREE.AdditiveBlending, depthWrite: false };
+  const matFine = new THREE.PointsMaterial({ color: wave.sig.color, size: 0.022, sizeAttenuation: true, opacity: 1,    ...ADDV });
+  const matGlow = new THREE.PointsMaterial({ color: wave.sig.color, size: 0.18,  sizeAttenuation: true, opacity: 0.28, ...ADDV });
+  const matCore = new THREE.PointsMaterial({ color: 0xffffff,       size: 0.008, sizeAttenuation: true, opacity: 0.6,  ...ADDV });
+
+  // Core white hot center — uses same fine positions
+  const geoCore = new THREE.BufferGeometry();
+  geoCore.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+  const ptsFine = new THREE.Points(geoFine, matFine);
+  const ptsGlow = new THREE.Points(geoGlow, matGlow);
+  const ptsCore = new THREE.Points(geoCore, matCore);
+  scene.add(ptsFine); scene.add(ptsGlow); scene.add(ptsCore);
+
+  // ── 3 shockwave rings (XY / XZ / YZ planes) ──────────────────────────────
+  const ringPts = [];
+  for (let i = 0; i <= 96; i++) {
+    const a = (i / 96) * Math.PI * 2;
+    ringPts.push(new THREE.Vector3(Math.cos(a), Math.sin(a), 0));
+  }
+  const baseRingGeo = new THREE.BufferGeometry().setFromPoints(ringPts);
+  const rings = [0, Math.PI/2, Math.PI/4].map((rx, ri) => {
+    const rg = baseRingGeo.clone();
+    const rm = new THREE.LineBasicMaterial({ color: wave.sig.color, transparent: true, opacity: 0.9, depthWrite: false });
+    const rl = new THREE.Line(rg, rm);
+    rl.position.set(cx, cy, cz);
+    rl.rotation.x = rx + ri * 0.6;
+    rl.rotation.y = ri * 0.9;
+    scene.add(rl);
+    return { line: rl, mat: rm, geo: rg };
+  });
+
+  // Kill original wave immediately
+  wave.dead = true;
+
+  // Screen flash at detonation
+  const fl = document.getElementById('white-flash');
+  if (fl) {
+    fl.style.transition = 'none'; fl.style.opacity = '0.75';
+    setTimeout(() => { fl.style.transition = 'opacity 0.55s ease'; fl.style.opacity = '0'; }, 60);
+  }
+
+  const DURATION = 3.0;
+  const DRAG     = 0.974;
+  const GRAVITY  = -0.12;
+
+  return new Promise(resolve => {
+    let age = 0;
+    const iv = setInterval(() => {
+      const dt = 0.016;
+      age += dt;
+      const p = Math.min(age / DURATION, 1);
+
+      // ── Physics update ─────────────────────────────────────────────────
+      for (let i = 0; i < N_FINE; i++) {
+        positions[i*3]   += velocities[i*3]   * dt;
+        positions[i*3+1] += velocities[i*3+1] * dt;
+        positions[i*3+2] += velocities[i*3+2] * dt;
+        velocities[i*3]   *= DRAG;
+        velocities[i*3+1]  = velocities[i*3+1] * DRAG + GRAVITY * dt;
+        velocities[i*3+2] *= DRAG;
+      }
+      geoFine.attributes.position.needsUpdate = true;
+      geoCore.attributes.position.needsUpdate = true;
+
+      for (let i = 0; i < N_GLOW; i++) {
+        glowPos[i*3]   += glowVel[i*3]   * dt;
+        glowPos[i*3+1] += glowVel[i*3+1] * dt;
+        glowPos[i*3+2] += glowVel[i*3+2] * dt;
+        glowVel[i*3]   *= DRAG;
+        glowVel[i*3+1]  = glowVel[i*3+1] * DRAG + GRAVITY * dt;
+        glowVel[i*3+2] *= DRAG;
+      }
+      geoGlow.attributes.position.needsUpdate = true;
+
+      // ── Opacity curves ─────────────────────────────────────────────────
+      matFine.opacity = p < 0.12 ? 1.0 : Math.max(0, Math.pow(1 - (p - 0.12) / 0.88, 1.4));
+      matGlow.opacity = p < 0.08 ? 0.28 : Math.max(0, 0.28 * Math.pow(1 - (p - 0.08) / 0.92, 1.1));
+      matCore.opacity = p < 0.05 ? 0.6  : Math.max(0, 0.6  * Math.pow(1 - (p - 0.05) / 0.4,  2.0));
+
+      // ── Shockwave rings ────────────────────────────────────────────────
+      rings.forEach((r, ri) => {
+        const rp = Math.min(age / (0.8 + ri * 0.15), 1);
+        r.line.scale.setScalar(1 + rp * 14);
+        r.mat.opacity = Math.max(0, 0.9 * (1 - rp * rp));
+      });
+
+      // ── Word text ──────────────────────────────────────────────────────
+      const textOp = p < 0.12 ? p / 0.12 : p < 0.65 ? 1 : Math.max(0, 1 - (p - 0.65) / 0.35);
+      wordEl.style.opacity   = textOp;
+      wordEl.style.transform = `scale(${1 + p * 0.1})`;
+
+      sessionChaosSpeed = 16 + (1 - p) * 10;
+
+      if (age >= DURATION + 0.15) {
+        clearInterval(iv);
+        scene.remove(ptsFine); scene.remove(ptsGlow); scene.remove(ptsCore);
+        geoFine.dispose(); geoGlow.dispose(); geoCore.dispose();
+        matFine.dispose(); matGlow.dispose(); matCore.dispose();
+        rings.forEach(r => { scene.remove(r.line); r.geo.dispose(); r.mat.dispose(); });
+        baseRingGeo.dispose();
+        wordEl.style.opacity = '0'; wordEl.style.transform = '';
+        resolve();
+      }
+    }, 16);
+  });
 }
 
 // LIVE AS ALL — organic evolutionary merge lasting until 0:00
