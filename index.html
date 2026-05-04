@@ -134,9 +134,9 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
 
 /* ── Input UI ─────────────────────────────────────────────────────────────── */
 #ui {
-  position: fixed; top: 32px; left: 36px;
+  position: fixed; bottom: 32px; right: 36px;
   z-index: 20; display: flex; flex-direction: column;
-  align-items: flex-start; gap: 10px;
+  align-items: flex-end; gap: 10px;
 }
 #qr-wrap {
   display: flex; flex-direction: column; align-items: center; gap: 10px;
@@ -151,12 +151,6 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
 }
 #counter { font-size: 9px; letter-spacing: 0.28em; text-transform: uppercase; color: rgba(255,255,255,0.18); font-family: monospace; }
 
-/* ── Controls hint ────────────────────────────────────────────────────────── */
-#hint {
-  position: fixed; bottom: 28px; right: 36px; z-index: 20;
-  font-size: 8px; letter-spacing: 0.3em; text-transform: uppercase;
-  color: rgba(255,255,255,0.12); font-family: monospace;
-}
 </style>
 </head>
 <body>
@@ -191,7 +185,6 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
   </div>
 </div>
 
-<div id="hint">Shift + Backspace — alles löschen</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js"></script>
