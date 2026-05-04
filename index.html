@@ -586,32 +586,28 @@ const _audio = (() => {
 
     voices.forEach(([freq, detune, peak], i) => {
       const osc = ctx.createOscillator();
-      osc.type = 'triangle'; // warmer than sine
+      osc.type = 'sine';
       osc.frequency.value = freq; osc.detune.value = detune;
 
       const g = ctx.createGain();
-      // Gentle LFO — very slow, subtle
+      // Very gentle LFO — barely perceptible breathe
       const lfo = ctx.createOscillator(); lfo.type = 'sine';
-      lfo.frequency.value = 0.022 + i * 0.006;
-      const lfoG = ctx.createGain(); lfoG.gain.value = peak * 0.18;
+      lfo.frequency.value = 0.018 + i * 0.004;
+      const lfoG = ctx.createGain(); lfoG.gain.value = peak * 0.04;
       lfo.connect(lfoG); lfoG.connect(g.gain);
 
       g.gain.setValueAtTime(0, now);
-      g.gain.linearRampToValueAtTime(peak, now + 4 + i * 1.6);
+      g.gain.linearRampToValueAtTime(peak, now + 6 + i * 2.0);
 
       osc.connect(g); g.connect(lpf);
       osc.start(now); lfo.start(now);
     });
-
-    // Very soft high-shelf air — adds presence without brightness
-    const hs = ctx.createBiquadFilter();
-    hs.type = 'highshelf'; hs.frequency.value = 3500; hs.gain.value = -6;
-    lpf.connect(hs);
   }
 
   function playSpawn(hash) {
-    if (!ctx || ctx.state !== 'running') return;
-    const freq = hashToHz(hash), now = ctx.currentTime;
+    if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume();
+    const freq = hashToHz(hash), now = ctx.currentTime + 0.05;
 
     // Rhodes-like warm pluck: 3 detuned sines for chorus, piano-style envelope
     [0, 8, -6].forEach((cents, i) => {
@@ -644,7 +640,8 @@ const _audio = (() => {
   }
 
   function playClash(hashA, hashB) {
-    if (!ctx || ctx.state !== 'running') return;
+    if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume();
     const fA = hashToHz(hashA), fB = hashToHz(hashB);
     // Major 7th chord voicing: lower + major 3rd + perfect 5th
     const fLow = Math.min(fA, fB);
@@ -2003,12 +2000,12 @@ async function purgeBurst(wave, wordEl) {
   });
 }
 
-// LIVE AS ALL — organic evolutionary merge lasting until 0:00
+// LIVE AS ALL — organic merge with visible attractor formation
 async function runLiveAsAll() {
   const waves = nameWaves.filter(w => !w.dead);
   if (!waves.length) return;
 
-  // ── Compute merged params + blended color immediately ─────────────────────
+  // ── Compute merged params + blended color ─────────────────────────────────
   const avg = { a:0, b:0, c:0, d:0 };
   waves.forEach(w => { avg.a+=w.params.a; avg.b+=w.params.b; avg.c+=w.params.c; avg.d+=w.params.d; });
   const wn = waves.length;
@@ -2017,25 +2014,43 @@ async function runLiveAsAll() {
 
   const blendColor = new THREE.Color(0, 0, 0);
   waves.forEach(w => blendColor.add(w.sig.color.clone().multiplyScalar(1 / wn)));
+  const blendHex = '#' + blendColor.getHexString();
 
-  // ── Pre-compute merged geometry + snapshot original positions ──────────────
+  // ── Pre-compute merged geometry + snapshot originals ──────────────────────
   const mergedPts = generateClifford3D(avg, MAX_PTS);
   const origPts   = waves.map(w => new Float32Array(w.cloud.geometry.attributes.position.array));
 
-  // ── Create merged wave early (hidden) — set survivorWave immediately ───────
+  // ── Create merged wave (totally hidden, drawRange=0) ──────────────────────
   const merged = new NameWave('COLLECTIVE', nameIdCnt++, true);
   merged.params = avg;
   merged.cloud.geometry.attributes.position.array.set(mergedPts.slice());
   merged.cloud.geometry.attributes.position.needsUpdate = true;
   merged.cloud2.geometry.attributes.position.array.set(mergedPts.slice());
   merged.cloud2.geometry.attributes.position.needsUpdate = true;
+  merged.cloud.geometry.setDrawRange(0, 0);
+  merged.cloud2.geometry.setDrawRange(0, 0);
   merged.mat.color.copy(blendColor);
   merged.mat2.color.copy(blendColor);
   merged.orbMat.color.copy(blendColor);
-  merged.mat.opacity = 0; merged.mat2.opacity = 0; merged.orbMat.opacity = 0;
+  merged.mat.opacity = 0.75; merged.mat2.opacity = 0.22; merged.orbMat.opacity = 0;
   merged.group.position.set(0, 0, 0);
   nameWaves.push(merged);
-  survivorWave = merged; // set early — survives any timing edge case
+  survivorWave = merged;
+
+  // ── Centered result overlay ────────────────────────────────────────────────
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:48;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;opacity:0;transition:opacity 1s ease;';
+  const ovNames = document.createElement('div');
+  ovNames.style.cssText = `font-size:9px;letter-spacing:0.5em;text-transform:uppercase;font-family:monospace;color:rgba(255,255,255,0.3);text-align:center;`;
+  ovNames.textContent = waves.map(w => w.name).join(' · ');
+  const ovTitle = document.createElement('div');
+  ovTitle.style.cssText = `font-size:52px;font-weight:200;letter-spacing:0.35em;text-transform:uppercase;font-family:monospace;color:${blendHex};text-shadow:0 0 60px ${blendHex},0 0 120px ${blendHex};text-align:center;`;
+  ovTitle.textContent = 'COLLECTIVE';
+  const ovSub = document.createElement('div');
+  ovSub.style.cssText = 'font-size:8px;letter-spacing:0.4em;text-transform:uppercase;font-family:monospace;color:rgba(255,255,255,0.2);text-align:center;margin-top:4px;';
+  ovSub.textContent = wn + ' identit' + (wn === 1 ? 'y' : 'ies') + ' converged';
+  ov.appendChild(ovNames); ov.appendChild(ovTitle); ov.appendChild(ovSub);
+  document.body.appendChild(ov);
 
   const starts = waves.map(w => w.center.clone());
   const origin  = new THREE.Vector3(0, 0, 0);
@@ -2051,9 +2066,9 @@ async function runLiveAsAll() {
     });
   }
 
-  // ── Phase 1 (0–3 s): awakening — glow, spin up ───────────────────────────
-  await phase(3000)(p => {
-    sessionChaosSpeed = 1 + p * 4;
+  // ── Phase 1 (0–2 s): awakening — glow up, spin up ────────────────────────
+  await phase(2000)(p => {
+    sessionChaosSpeed = 1 + p * 5;
     waves.forEach(w => {
       if (w.dead) return;
       w.mat.opacity  = Math.min(1.0, 0.65 + p * 0.35);
@@ -2061,82 +2076,90 @@ async function runLiveAsAll() {
     });
   });
 
-  // ── Phase 2 (3–8 s): gathering — drift inward, color bleed begins ─────────
+  // ── Phase 2 (2–7 s): gathering — drift + morph toward merged form ─────────
   await phase(5000)(p => {
-    sessionChaosSpeed = 4 + p * 4;
-    liveAsAllShake = p * 0.07;
+    sessionChaosSpeed = 5 + p * 5;
+    liveAsAllShake = p * 0.1;
+    const ease = p * p;
     waves.forEach((w, i) => {
       if (w.dead) return;
-      // Gentle oscillating drift — organic, not mechanical
-      const pulse = Math.sin(p * Math.PI * 2.5) * 0.12 * (1 - p);
-      w.center.lerpVectors(starts[i], origin, p * p * 0.55 + pulse);
+      // Spiral inward with gentle pulse
+      const pulse = Math.sin(p * Math.PI * 3) * 0.08 * (1 - p);
+      w.center.lerpVectors(starts[i], origin, ease * 0.6 + pulse);
       w.group.position.copy(w.center);
-      w.mat.color.lerp(blendColor, 0.018);
-      w.mat2.color.lerp(blendColor, 0.018);
+      // Color bleeds toward blend
+      w.mat.color.lerp(blendColor, 0.025);
+      w.mat2.color.lerp(blendColor, 0.025);
+      // Geometry starts morphing toward merged shape
+      const pos = w.cloud.geometry.attributes.position.array;
+      const orig = origPts[i];
+      for (let k = 0; k < pos.length; k++)
+        pos[k] = orig[k] + (mergedPts[k] - orig[k]) * ease * 0.5;
+      w.cloud.geometry.attributes.position.needsUpdate = true;
     });
   });
 
-  // ── Phase 3 (8–17 s): metamorphosis — geometry morphs, shapes transform ───
-  // This is the core: each wave's point positions lerp toward merged shape
+  // ── Phase 3 (7–9 s): convergence crash — all collapse to origin ───────────
   const preM = waves.map(w => w.center.clone());
-  await phase(9000)(p => {
-    const ease = p < 0.5 ? 2*p*p : -1+(4-2*p)*p; // smooth in-out
-    sessionChaosSpeed = 8 + ease * 5;
-    liveAsAllShake = 0.07 + ease * 0.2;
-
+  await phase(2000)(p => {
+    sessionChaosSpeed = 10 + p * 8;
+    liveAsAllShake = 0.1 + p * 0.55;
+    const ease = p * p;
     waves.forEach((w, i) => {
       if (w.dead) return;
-
-      // Converge to center
       w.center.lerpVectors(preM[i], origin, ease);
       w.group.position.copy(w.center);
-
-      // ── Morph geometry toward merged shape ──────────────────────────────
-      // Cloud 1 (dense, small points)
-      const pos  = w.cloud.geometry.attributes.position.array;
-      const orig = origPts[i];
-      for (let k = 0; k < pos.length; k++)
-        pos[k] = orig[k] + (mergedPts[k] - orig[k]) * ease;
-      w.cloud.geometry.attributes.position.needsUpdate = true;
-
-      // Cloud 2 (sparse, large points) — same positions, different material
-      const pos2 = w.cloud2.geometry.attributes.position.array;
-      for (let k = 0; k < pos2.length; k++)
-        pos2[k] = orig[k] + (mergedPts[k] - orig[k]) * ease;
-      w.cloud2.geometry.attributes.position.needsUpdate = true;
-
-      // Color fully converges
-      w.mat.color.lerp(blendColor, 0.04);
-      w.mat2.color.lerp(blendColor, 0.04);
-
-      // Individuals fade out as merged fades in
-      const fadeOut = Math.max(0, 1 - p * 1.15);
+      w.mat.color.lerp(blendColor, 0.08);
+      w.mat2.color.lerp(blendColor, 0.08);
+      // Fade out as they arrive
+      const fadeOut = Math.max(0, 1 - p * 1.4);
       w.mat.opacity    = 0.65 * fadeOut;
       w.mat2.opacity   = 0.55 * fadeOut;
       w.orbMat.opacity = 0.13 * fadeOut;
       if (fadeOut < 0.01) w.dead = true;
     });
-
-    // Merged fades in in the second half of this phase
-    const fadeIn = Math.max(0, (p - 0.35) / 0.65);
-    merged.mat.opacity    = Math.min(0.65, fadeIn * 0.65);
-    merged.mat2.opacity   = Math.min(0.16, fadeIn * 0.16);
-    merged.orbMat.opacity = Math.min(0.13, fadeIn * 0.13);
   });
-
   waves.forEach(w => { w.dead = true; });
 
-  // ── Phase 4 (17–20 s): settling — merged attractor breathes and stabilises ─
-  await phase(3000)(p => {
-    sessionChaosSpeed = Math.max(1, 13 - p * 12);
-    liveAsAllShake = Math.max(0, 0.27 - p * 0.27);
-    merged.mat.opacity    = Math.min(0.65, 0.52 + p * 0.13);
-    merged.mat2.opacity   = Math.min(0.16, 0.12 + p * 0.04);
-    merged.orbMat.opacity = Math.min(0.13, 0.1  + p * 0.03);
+  // Flash at moment of fusion
+  const fl = document.getElementById('white-flash');
+  if (fl) {
+    fl.style.transition = 'none'; fl.style.opacity = '0.6';
+    setTimeout(() => { fl.style.transition = 'opacity 0.8s ease'; fl.style.opacity = '0'; }, 80);
+  }
+  liveAsAllShake = 0.8;
+
+  // ── Phase 4 (9–16 s): FORMATION — merged attractor builds up at center ─────
+  // drawRange goes 0 → MAX_PTS, making the new shape visibly emerge point by point
+  ov.style.opacity = '1'; // reveal overlay
+  await phase(7000)(p => {
+    const ease = p < 0.5 ? 2*p*p : -1+(4-2*p)*p;
+    sessionChaosSpeed = Math.max(2, 18 - ease * 16);
+    liveAsAllShake = Math.max(0, 0.8 - ease * 0.75);
+    // Build merged attractor point by point
+    const drawCount = Math.floor(ease * MAX_PTS);
+    merged.cloud.geometry.setDrawRange(0, drawCount);
+    merged.cloud2.geometry.setDrawRange(0, Math.floor(drawCount * 0.4));
+    merged.group.position.set(0, 0, 0);
   });
 
+  // ── Phase 5 (16–20 s): established — orbits freely, overlay fades ─────────
+  merged.cloud.geometry.setDrawRange(0, MAX_PTS);
+  merged.cloud2.geometry.setDrawRange(0, MAX_PTS);
   liveAsAllShake = 0;
-  // 0:00 white flash fires automatically from the render loop → resetSession
+  sessionChaosSpeed = 1;
+
+  // Fade overlay after a moment
+  setTimeout(() => { ov.style.opacity = '0'; }, 800);
+  await phase(4000)(p => {
+    merged.mat.opacity    = Math.min(0.75, 0.65 + p * 0.1);
+    merged.mat2.opacity   = Math.min(0.22, 0.18 + p * 0.04);
+    merged.orbMat.opacity = Math.min(0.13, p * 0.13);
+  });
+
+  ov.remove();
+  liveAsAllShake = 0;
+  // 0:00 white flash fires automatically → resetSession
 }
 
 function doWhiteFlash() {
