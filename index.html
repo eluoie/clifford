@@ -1461,25 +1461,84 @@ function handlePhaseChange(from, to) {
   if (to === 'flash') doWhiteFlash();
 }
 
-// DIE AS ONE — explode attractors one by one
-function explodeWave(wave) {
-  return new Promise(resolve => {
-    let t = 0;
-    wave._exploding = true;
-    const iv = setInterval(() => {
-      t += 0.018;
-      wave.group.scale.setScalar(1 + t * 3);
-      const o = Math.max(0, 1 - t * 1.4);
-      wave.mat.opacity = 0.65 * o; wave.mat2.opacity = 0.16 * o; wave.orbMat.opacity = 0.13 * o;
-      if (t >= 0.85) { clearInterval(iv); wave.dead = true; resolve(); }
-    }, 16);
-  });
-}
+// DIE AS ONE — glorious firework explosions
 async function runDieAsOne() {
+  // No survivor
+  localStorage.removeItem('clf-survivor');
+  survivorWave = null;
+
+  // Keep chaos roaring throughout result phase
+  sessionChaosSpeed = 14;
+
+  // Full-screen word overlay
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:50;display:flex;align-items:center;justify-content:center;';
+  document.body.appendChild(overlay);
+  const wordEl = document.createElement('div');
+  wordEl.style.cssText = 'font-weight:200;letter-spacing:0.38em;text-transform:uppercase;font-family:monospace;opacity:0;text-align:center;padding:0 5vw;box-sizing:border-box;white-space:nowrap;';
+  overlay.appendChild(wordEl);
+
   const waves = [...nameWaves];
   for (const w of waves) {
-    if (!w.dead) { await explodeWave(w); await new Promise(r => setTimeout(r, 350)); }
+    if (w.dead) continue;
+
+    // Style word in wave's color
+    const hex = '#' + w.sig.color.getHexString();
+    wordEl.textContent = w.name;
+    wordEl.style.color = hex;
+    wordEl.style.fontSize = '120px';
+    wordEl.style.opacity = '1';
+    // Shrink to fit screen width
+    let fs = 120;
+    while (fs > 8 && wordEl.scrollWidth > window.innerWidth * 0.9) { fs -= 2; wordEl.style.fontSize = fs + 'px'; }
+    wordEl.style.opacity = '0';
+    wordEl.style.textShadow = `0 0 40px ${hex}, 0 0 80px ${hex}, 0 0 160px ${hex}`;
+
+    // Explode attractor + fade in word simultaneously
+    let fadeDone = false;
+    const fadePromise = new Promise(res => {
+      const t0 = Date.now();
+      const iv = setInterval(() => {
+        const p = Math.min((Date.now() - t0) / 500, 1);
+        wordEl.style.opacity = p;
+        if (p >= 1) { clearInterval(iv); fadeDone = true; res(); }
+      }, 16);
+    });
+
+    await new Promise(resolve => {
+      let t = 0;
+      const iv = setInterval(() => {
+        t += 0.016;
+        const p = Math.min(t / 1.6, 1);
+        // Expand to fill screen
+        w.group.scale.setScalar(1 + p * 36);
+        // Brightness: spikes at 40% then fades
+        const bright = p < 0.4 ? p / 0.4 : Math.max(0, 1 - (p - 0.4) / 0.6);
+        w.mat.opacity    = 0.9 * bright;
+        w.mat2.opacity   = 0.5 * bright;
+        w.orbMat.opacity = 0.3 * bright;
+        // Keep chaos speed up
+        sessionChaosSpeed = 12 + bright * 8;
+        if (p >= 1) { clearInterval(iv); w.dead = true; resolve(); }
+      }, 16);
+    });
+
+    // Hold word briefly then fade out
+    await new Promise(r => setTimeout(r, 400));
+    await new Promise(res => {
+      const t0 = Date.now();
+      const iv = setInterval(() => {
+        const p = Math.min((Date.now() - t0) / 600, 1);
+        wordEl.style.opacity = 1 - p;
+        if (p >= 1) { clearInterval(iv); res(); }
+      }, 16);
+    });
+    await new Promise(r => setTimeout(r, 150));
   }
+
+  overlay.remove();
+  // Keep chaos speed elevated until white flash
+  sessionChaosSpeed = 14;
 }
 
 // LIVE AS ALL — dramatic multi-phase fusion sequence
@@ -1729,7 +1788,7 @@ let elapsed = 0, frame = 0, camAngle = 0;
   camera.position.z = Math.cos(camAngle) * 22;
   if (sessionPhase === 'chaos' || sessionPhase === 'result' || liveAsAllShake > 0) {
     const shake = liveAsAllShake > 0 ? liveAsAllShake
-      : (sessionPhase === 'chaos' ? (sessionChaosSpeed - 1) * 0.09 : 0.05);
+      : (sessionChaosSpeed - 1) * 0.09;
     camera.position.x += (Math.random() - 0.5) * shake;
     camera.position.y += (Math.random() - 0.5) * shake;
     camera.position.z += (Math.random() - 0.5) * shake;
