@@ -1240,7 +1240,7 @@ async function spawnName(name) {
   const wave = new NameWave(name, id, true);
   nameWaves.push(wave);
   while (nameWaves.length > 10) nameWaves.shift().destroy();
-  document.getElementById('count').textContent = nameWaves.length;
+  
 
   // Overlay runs AFTER — wave already visible behind it
   await runSequence(name, wave.sig, wave.params);
@@ -1258,7 +1258,7 @@ _toLoad.forEach(n => {
   const w  = new NameWave(n, id, true);
   nameWaves.push(w);
 });
-document.getElementById('count').textContent = nameWaves.length;
+
 
 // ── Clear all ─────────────────────────────────────────────────────────────────
 function clearAll() {
@@ -1270,7 +1270,7 @@ function clearAll() {
   relationLines.forEach(rl => scene.remove(rl.line)); relationLines.clear();
   Object.values(labelPool).forEach(lp => lp.el.remove());
   Object.keys(labelPool).forEach(k => delete labelPool[k]);
-  document.getElementById('count').textContent = 0;
+  
 }
 
 // ── QR + real-time input via MQTT (HiveMQ public broker) ──────────────────────
