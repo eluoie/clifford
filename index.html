@@ -35,7 +35,7 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
 /* ── Sequence overlay ─────────────────────────────────────────────────────── */
 #seq-overlay {
   position: fixed; top: 24px; left: 24px;
-  width: 520px; height: 300px;
+  width: 280px;
   z-index: 40;
   background: rgba(0,0,0,0.88);
   backdrop-filter: blur(12px);
@@ -44,18 +44,18 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
   display: none;
   opacity: 0;
   transition: opacity 0.9s ease;
-  flex-direction: row;
+  flex-direction: column;
   overflow: hidden;
 }
 
 #seq-left {
-  flex: 1;
   display: flex; align-items: center; justify-content: center;
-  padding: 16px;
+  padding: 20px 16px 14px;
   position: relative;
+  min-height: 130px;
 }
 
-/* Name display — centred in left panel */
+/* Name display — centred in top panel */
 #seq-name {
   font-weight: 200;
   letter-spacing: 0.38em;
@@ -100,13 +100,12 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
   100% { transform: perspective(900px) rotateZ(360deg) rotateX(20deg)  rotateY(5deg); }
 }
 
-/* Right column — calculation panels */
+/* Bottom section — calculation panels */
 #seq-right {
-  width: 220px;
-  display: flex; flex-direction: column; justify-content: center;
+  display: flex; flex-direction: column; justify-content: flex-start;
   gap: 8px;
-  padding: 14px 14px 14px 10px;
-  border-left: 1px solid rgba(255,255,255,0.07);
+  padding: 10px 14px 14px;
+  border-top: 1px solid rgba(255,255,255,0.07);
   overflow-y: auto;
 }
 
