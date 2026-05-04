@@ -1897,183 +1897,221 @@ async function purgeBurst(wave, wordEl) {
   });
 }
 
-// LIVE AS ALL — organic merge with visible attractor formation
+// LIVE AS ALL — organic merge / rebirth
 async function runLiveAsAll() {
   const waves = nameWaves.filter(w => !w.dead);
   if (!waves.length) return;
 
-  // ── Compute merged params + blended color ─────────────────────────────────
+  // ── Merged params + blended color ─────────────────────────────────────────
   const avg = { a:0, b:0, c:0, d:0 };
   waves.forEach(w => { avg.a+=w.params.a; avg.b+=w.params.b; avg.c+=w.params.c; avg.d+=w.params.d; });
   const wn = waves.length;
   avg.a/=wn; avg.b/=wn; avg.c/=wn; avg.d/=wn;
   localStorage.setItem('clf-survivor', JSON.stringify({ params: avg, name: 'COLLECTIVE' }));
 
-  const blendColor = new THREE.Color(0, 0, 0);
-  waves.forEach(w => blendColor.add(w.sig.color.clone().multiplyScalar(1 / wn)));
+  const blendColor = new THREE.Color(0,0,0);
+  waves.forEach(w => blendColor.add(w.sig.color.clone().multiplyScalar(1/wn)));
 
-  // ── Pre-compute merged geometry + snapshot originals ──────────────────────
   const mergedPts = generateClifford3D(avg, MAX_PTS);
   const origPts   = waves.map(w => new Float32Array(w.cloud.geometry.attributes.position.array));
 
-  // ── Create merged wave (hidden, drawRange=0) ──────────────────────────────
+  // ── Build 2D canvas now (CPU work — done before animation starts) ──────────
+  const DPR    = Math.min(devicePixelRatio, 2);
+  const SZ_css = Math.round(Math.min(innerWidth, innerHeight) * 0.64);
+  const SZ     = SZ_css * DPR;
+  const cvs = document.createElement('canvas');
+  cvs.width = SZ; cvs.height = SZ;
+  cvs.style.width = SZ_css + 'px'; cvs.style.height = SZ_css + 'px';
+  const c2 = cvs.getContext('2d');
+  let mnX=Infinity,mxX=-Infinity,mnY=Infinity,mxY=-Infinity;
+  for (let k=0; k<mergedPts.length; k+=3) {
+    if (mergedPts[k]   < mnX) mnX=mergedPts[k];   if (mergedPts[k]   > mxX) mxX=mergedPts[k];
+    if (mergedPts[k+1] < mnY) mnY=mergedPts[k+1]; if (mergedPts[k+1] > mxY) mxY=mergedPts[k+1];
+  }
+  const pad2 = 36 * DPR;
+  const sc2 = Math.min((SZ-pad2*2)/(mxX-mnX), (SZ-pad2*2)/(mxY-mnY));
+  const cr=Math.round(blendColor.r*255), cg=Math.round(blendColor.g*255), cb2=Math.round(blendColor.b*255);
+  // Black base
+  c2.fillStyle = '#000'; c2.fillRect(0,0,SZ,SZ);
+  // Additive blending — dense regions accumulate brightness, exactly like the 3D scene
+  c2.globalCompositeOperation = 'lighter';
+  // Wide glow pass
+  c2.fillStyle = `rgba(${cr},${cg},${cb2},0.018)`;
+  for (let k=0; k<mergedPts.length; k+=3) {
+    const px=(mergedPts[k]-mnX)*sc2+pad2, py=SZ-((mergedPts[k+1]-mnY)*sc2+pad2);
+    c2.fillRect(px-2,py-2,5*DPR,5*DPR);
+  }
+  // Tight core pass
+  c2.fillStyle = `rgba(${cr},${cg},${cb2},0.09)`;
+  for (let k=0; k<mergedPts.length; k+=3) {
+    const px=(mergedPts[k]-mnX)*sc2+pad2, py=SZ-((mergedPts[k+1]-mnY)*sc2+pad2);
+    c2.fillRect(px,py,1.8*DPR,1.8*DPR);
+  }
+
+  // ── Create merged wave (hidden) ────────────────────────────────────────────
   const merged = new NameWave('COLLECTIVE', nameIdCnt++, true);
   merged.params = avg;
   merged.cloud.geometry.attributes.position.array.set(mergedPts.slice());
   merged.cloud.geometry.attributes.position.needsUpdate = true;
   merged.cloud2.geometry.attributes.position.array.set(mergedPts.slice());
   merged.cloud2.geometry.attributes.position.needsUpdate = true;
-  merged.cloud.geometry.setDrawRange(0, 0);
-  merged.cloud2.geometry.setDrawRange(0, 0);
-  merged.mat.color.copy(blendColor);
-  merged.mat2.color.copy(blendColor);
-  merged.orbMat.color.copy(blendColor);
-  merged.mat.opacity = 0; merged.mat2.opacity = 0; merged.orbMat.opacity = 0;
-  merged.group.position.set(0, 0, 0);
+  merged.cloud.geometry.setDrawRange(0,0); merged.cloud2.geometry.setDrawRange(0,0);
+  merged.mat.color.copy(blendColor); merged.mat2.color.copy(blendColor); merged.orbMat.color.copy(blendColor);
+  merged.mat.opacity=0; merged.mat2.opacity=0; merged.orbMat.opacity=0;
+  merged.group.position.set(0,0,0);
   nameWaves.push(merged);
   survivorWave = merged;
 
   const starts = waves.map(w => w.center.clone());
-  const origin  = new THREE.Vector3(0, 0, 0);
+  const origin  = new THREE.Vector3(0,0,0);
 
   function phase(ms) {
     const t0 = Date.now();
     return cb => new Promise(resolve => {
       const iv = setInterval(() => {
-        const p = Math.min(1, (Date.now() - t0) / ms);
+        const p = Math.min(1, (Date.now()-t0)/ms);
         cb(p);
-        if (p >= 1) { clearInterval(iv); resolve(); }
+        if (p>=1) { clearInterval(iv); resolve(); }
       }, 16);
     });
   }
 
-  // ── Phase 1 (0–2 s): awakening — glow up, spin up ────────────────────────
-  await phase(2000)(p => {
-    sessionChaosSpeed = 1 + p * 6;
+  // ── Phase 1 (0–1.5 s): awakening — glow + spin up ────────────────────────
+  await phase(1500)(p => {
+    sessionChaosSpeed = 1 + p * 7;
     waves.forEach(w => {
       if (w.dead) return;
       w.mat.opacity  = Math.min(1.0, 0.65 + p * 0.35);
-      w.mat2.opacity = Math.min(0.55, 0.16 + p * 0.39);
+      w.mat2.opacity = Math.min(0.65, 0.16 + p * 0.49);
     });
   });
 
-  // ── Phase 2 (2–8 s): tangle — interweaving geometry morph + convergence ───
-  // Each wave morphs with a per-wave oscillating phase offset so shapes
-  // visibly tangle and mingle as they converge spatially.
-  await phase(6000)(p => {
-    sessionChaosSpeed = 6 + p * 7;
-    liveAsAllShake = p * 0.14;
-    const easeIn = p * p;
+  // ── Phase 2 (1.5–4 s): breath outward — gather energy before collapse ─────
+  // Each attractor swells away from center, like a deep inhale before implosion
+  const swellDirs = waves.map((w, i) => {
+    const d = w.center.clone().normalize();
+    return d.length() > 0.1 ? d : new THREE.Vector3(Math.cos(i*2.1), Math.sin(i*2.1), 0);
+  });
+  await phase(2500)(p => {
+    sessionChaosSpeed = 7 + p * 3;
+    liveAsAllShake = p * 0.05;
+    const swell = Math.sin(p * Math.PI); // 0 → peak → 0 — breathes outward then back
     waves.forEach((w, i) => {
       if (w.dead) return;
-      // Pull toward center — fully overlapping by end
-      w.center.lerpVectors(starts[i], origin, easeIn * 0.9);
+      w.center.copy(starts[i]).addScaledVector(swellDirs[i], swell * 1.8);
       w.group.position.copy(w.center);
-      // Color bleeds aggressively toward blend
-      w.mat.color.lerp(blendColor, 0.05);
-      w.mat2.color.lerp(blendColor, 0.05);
-      // Geometry morph with per-wave oscillation — the phase offset (i * 1.4)
-      // makes waves morph at different rhythms, creating the tangling visual
-      const osc   = Math.sin(p * Math.PI * 6 + i * 1.4) * 0.18 * (1 - easeIn);
-      const morphT = Math.min(1, Math.max(0, easeIn + osc));
-      const pos  = w.cloud.geometry.attributes.position.array;
-      const orig = origPts[i];
-      for (let k = 0; k < pos.length; k++)
-        pos[k] = orig[k] + (mergedPts[k] - orig[k]) * morphT;
-      w.cloud.geometry.attributes.position.needsUpdate = true;
+      w.group.scale.setScalar(1 + swell * 0.18);
+      w.mat.color.lerp(blendColor, 0.018);
+      w.mat2.color.lerp(blendColor, 0.018);
     });
   });
 
-  // ── Phase 3 (8–10.5 s): final crash — collapse, full fade, fusion flash ───
+  // ── Phase 3 (4–10.5 s): spiral convergence + deep tangle ─────────────────
+  // Waves spiral inward on different arcs, geometry interweaves with strong
+  // per-wave oscillation so each attractor visibly tangles with its neighbors
+  const spiralStarts = waves.map(w => w.center.clone());
+  await phase(6500)(p => {
+    sessionChaosSpeed = 10 + p * 12;
+    liveAsAllShake = 0.05 + p * 0.28;
+    const easeIn = p*p;
+    waves.forEach((w, i) => {
+      if (w.dead) return;
+      // Spiral: shrinking radius + rotation, each wave on its own arc
+      const angle = (i/wn)*Math.PI*2 + p * Math.PI * 2.5;
+      const radius = (1-easeIn) * spiralStarts[i].length();
+      const spiralPt = new THREE.Vector3(Math.cos(angle)*radius, Math.sin(angle)*radius*0.4, Math.sin(angle*0.7)*radius*0.3);
+      w.center.lerp(spiralPt.lerp(origin, easeIn*0.85), 0.12);
+      w.group.position.copy(w.center);
+      w.group.scale.setScalar(1);
+      // Aggressive color convergence
+      w.mat.color.lerp(blendColor, 0.06 + easeIn*0.04);
+      w.mat2.color.lerp(blendColor, 0.06 + easeIn*0.04);
+      // Geometry tangle: strong oscillation with per-wave phase offset
+      // creates the interweaving visual as forms morph at different rhythms
+      const osc   = Math.sin(p * Math.PI * 9 + i * 2.1) * 0.25 * (1-easeIn);
+      const morphT = Math.min(1, Math.max(0, easeIn + osc));
+      const pos = w.cloud.geometry.attributes.position.array;
+      const orig = origPts[i];
+      for (let k=0; k<pos.length; k++) pos[k] = orig[k] + (mergedPts[k]-orig[k]) * morphT;
+      w.cloud.geometry.attributes.position.needsUpdate = true;
+      // Brighten toward peak — supernova before death
+      w.mat.opacity  = Math.min(1.2, 1.0 + easeIn * 0.2);
+      w.mat2.opacity = Math.min(0.85, 0.65 + easeIn * 0.2);
+    });
+  });
+
+  // ── Phase 4 (10.5–12.5 s): extinction — rapid collapse + death ───────────
   const preM = waves.map(w => w.center.clone());
-  await phase(2500)(p => {
-    sessionChaosSpeed = 13 + p * 8;
-    liveAsAllShake = 0.14 + p * 0.66;
-    const ease = p * p;
+  await phase(2000)(p => {
+    sessionChaosSpeed = 22 + p * 12;
+    liveAsAllShake = 0.3 + p * 1.4;
+    const ease = p*p;
     waves.forEach((w, i) => {
       if (w.dead) return;
       w.center.lerpVectors(preM[i], origin, ease);
       w.group.position.copy(w.center);
-      w.mat.color.lerp(blendColor, 0.14);
-      w.mat2.color.lerp(blendColor, 0.14);
-      const fadeOut = Math.max(0, 1 - p * 1.5);
+      w.mat.color.lerp(blendColor, 0.22);
+      w.mat2.color.lerp(blendColor, 0.22);
+      const fadeOut = Math.max(0, 1 - p*2.2);
       w.mat.opacity    = fadeOut;
-      w.mat2.opacity   = 0.55 * fadeOut;
-      w.orbMat.opacity = 0.13 * fadeOut;
-      if (fadeOut < 0.01) w.dead = true;
+      w.mat2.opacity   = fadeOut * 0.85;
+      w.orbMat.opacity = fadeOut * 0.13;
+      if (fadeOut < 0.005) w.dead = true;
     });
   });
   waves.forEach(w => { w.dead = true; });
 
-  // Fusion flash
+  // ── REBIRTH FLASH ─────────────────────────────────────────────────────────
   const fl = document.getElementById('white-flash');
   if (fl) {
-    fl.style.transition = 'none'; fl.style.opacity = '0.7';
-    setTimeout(() => { fl.style.transition = 'opacity 1.2s ease'; fl.style.opacity = '0'; }, 80);
+    fl.style.transition = 'none'; fl.style.opacity = '1';
+    setTimeout(() => { fl.style.transition = 'opacity 2.2s ease'; fl.style.opacity = '0'; }, 140);
   }
-  liveAsAllShake = 0.9;
+  liveAsAllShake = 1.8;
 
-  // ── Phase 4 (10.5–15.5 s): merged attractor builds point-by-point in 3D ──
-  await phase(5000)(p => {
+  // ── Phase 5 (12.5–16 s): new attractor emerges from silence ──────────────
+  // drawRange 0 → MAX_PTS with breathing pulse; 2D overlay begins fading in now
+  // so it's visible for ~7.5 s before the session-timer white flash at 0:00
+  const ov = document.createElement('div');
+  ov.style.cssText = [
+    'position:fixed;inset:0;z-index:48;pointer-events:none;',
+    'display:flex;align-items:center;justify-content:center;',
+    'opacity:0;transition:opacity 2.2s ease;',
+    'background:rgba(0,0,0,0.72);backdrop-filter:blur(5px);',
+  ].join('');
+  cvs.style.borderRadius = '3px';
+  cvs.style.boxShadow = `0 0 120px rgba(${cr},${cg},${cb2},0.45),0 0 240px rgba(${cr},${cg},${cb2},0.18)`;
+  ov.appendChild(cvs);
+  document.body.appendChild(ov);
+  requestAnimationFrame(() => requestAnimationFrame(() => { ov.style.opacity = '1'; }));
+
+  await phase(3500)(p => {
     const ease = p < 0.5 ? 2*p*p : -1+(4-2*p)*p;
-    sessionChaosSpeed = Math.max(2, 16 - ease * 14);
-    liveAsAllShake = Math.max(0, 0.9 - ease * 0.85);
-    merged.mat.opacity  = ease * 0.75;
-    merged.mat2.opacity = ease * 0.22;
+    sessionChaosSpeed = Math.max(1.5, 18 - ease*16);
+    liveAsAllShake = Math.max(0, 1.8 - ease*1.75);
+    // Breathing pulse as attractor assembles
+    const breathe = 1 + Math.sin(p*Math.PI*4) * 0.2 * (1-ease);
+    merged.mat.opacity  = ease * 0.78 * breathe;
+    merged.mat2.opacity = ease * 0.24 * breathe;
     const drawCount = Math.floor(ease * MAX_PTS);
     merged.cloud.geometry.setDrawRange(0, drawCount);
-    merged.cloud2.geometry.setDrawRange(0, Math.floor(drawCount * 0.4));
-    merged.group.position.set(0, 0, 0);
+    merged.cloud2.geometry.setDrawRange(0, Math.floor(drawCount*0.4));
+    merged.group.position.set(0,0,0);
   });
 
-  // ── Phase 5 (15.5–19.5 s): 2D attractor overlay — the new form revealed ──
+  // ── Phase 6 (16–20 s): settled — overlay holds, attractor glows ──────────
   merged.cloud.geometry.setDrawRange(0, MAX_PTS);
   merged.cloud2.geometry.setDrawRange(0, MAX_PTS);
   merged.mat.opacity = 0.75; merged.mat2.opacity = 0.22;
   liveAsAllShake = 0; sessionChaosSpeed = 1.5;
 
-  // Render merged attractor to a 2D canvas
-  const SZ = Math.round(Math.min(innerWidth, innerHeight) * 0.6);
-  const cvs = document.createElement('canvas');
-  cvs.width = SZ; cvs.height = SZ;
-  const c2 = cvs.getContext('2d');
-  let mnX=Infinity, mxX=-Infinity, mnY=Infinity, mxY=-Infinity;
-  for (let k = 0; k < mergedPts.length; k += 3) {
-    if (mergedPts[k] < mnX) mnX = mergedPts[k];
-    if (mergedPts[k] > mxX) mxX = mergedPts[k];
-    if (mergedPts[k+1] < mnY) mnY = mergedPts[k+1];
-    if (mergedPts[k+1] > mxY) mxY = mergedPts[k+1];
-  }
-  const pad = 24;
-  const sc2 = Math.min((SZ - pad*2) / (mxX - mnX), (SZ - pad*2) / (mxY - mnY));
-  const cr = Math.round(blendColor.r*255), cg = Math.round(blendColor.g*255), cb2 = Math.round(blendColor.b*255);
-  c2.fillStyle = `rgba(${cr},${cg},${cb2},0.22)`;
-  for (let k = 0; k < mergedPts.length; k += 3) {
-    const px = (mergedPts[k]   - mnX) * sc2 + pad;
-    const py = SZ - ((mergedPts[k+1] - mnY) * sc2 + pad);
-    c2.fillRect(px, py, 1.4, 1.4);
-  }
-
-  // Overlay container
-  const ov = document.createElement('div');
-  ov.style.cssText = [
-    'position:fixed;inset:0;z-index:48;pointer-events:none;',
-    'display:flex;align-items:center;justify-content:center;',
-    'opacity:0;transition:opacity 1.6s ease;',
-    'background:rgba(0,0,0,0.55);backdrop-filter:blur(3px);',
-  ].join('');
-  cvs.style.cssText = `border-radius:2px;box-shadow:0 0 80px rgba(${cr},${cg},${cb2},0.3),0 0 160px rgba(${cr},${cg},${cb2},0.12);`;
-  ov.appendChild(cvs);
-  document.body.appendChild(ov);
-  requestAnimationFrame(() => requestAnimationFrame(() => { ov.style.opacity = '1'; }));
-
-  await phase(4000)(p => {
-    merged.orbMat.opacity = p * 0.13;
+  await phase(4500)(p => {
+    merged.orbMat.opacity = Math.min(0.13, p * 0.13);
   });
 
   ov.remove();
   liveAsAllShake = 0;
-  // 0:00 white flash fires automatically → resetSession
+  // 0:00 white flash fires automatically via session timer → resetSession
 }
 
 function doWhiteFlash() {
