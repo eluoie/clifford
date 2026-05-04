@@ -328,12 +328,21 @@ body {
 #ip-send-btn:active:not(:disabled) { opacity:0.8; }
 #ip-send-btn:disabled { opacity:0.25; cursor:default; }
 /* After vote */
-#ip-voted { display:none; flex-direction:column; align-items:center; gap:28px; width:100%; }
-.ip-timer-row { font-size:8px; letter-spacing:0.4em; text-transform:uppercase; font-family:monospace; color:rgba(255,255,255,0.2); text-align:center; }
-.ip-timer-val { color:rgba(255,255,255,0.55); }
-.ip-split-bar { width:100%; height:2px; border-radius:1px; overflow:hidden; background:rgba(255,255,255,0.08); display:flex; }
-.ip-split-a { height:100%; background:rgba(255,255,255,0.75); transition:width 0.5s ease; }
-.ip-split-b { height:100%; background:rgba(255,255,255,0.22); flex:1; }
+#ip-voted { display:none; flex-direction:column; align-items:center; gap:36px; width:100%; padding-top:8px; }
+.iv-timer-section { display:flex; flex-direction:column; align-items:center; gap:8px; }
+.iv-timer-label { font-size:8px; letter-spacing:0.5em; text-transform:uppercase; color:rgba(255,255,255,0.2); font-family:monospace; }
+.iv-timer-val { font-size:88px; font-weight:100; letter-spacing:0.05em; font-family:monospace; color:#fff; line-height:1; }
+.iv-chart { display:flex; gap:12px; width:100%; height:260px; }
+.iv-col { flex:1; display:flex; flex-direction:column; align-items:center; gap:10px; }
+.iv-pct { font-size:13px; font-weight:200; font-family:monospace; letter-spacing:0.08em; color:rgba(255,255,255,0.5); height:18px; }
+.iv-bar-wrap { width:100%; flex:1; background:rgba(255,255,255,0.05); border-radius:10px; overflow:hidden; display:flex; flex-direction:column; justify-content:flex-end; }
+.iv-bar { width:100%; transition:height 0.7s cubic-bezier(0.4,0,0.2,1); border-radius:10px; }
+.iv-bar-die  { background:linear-gradient(to top, rgba(255,70,50,0.95), rgba(255,150,80,0.5)); }
+.iv-bar-live { background:linear-gradient(to top, rgba(60,180,255,0.95), rgba(120,230,255,0.5)); }
+.iv-col-label { font-size:8px; letter-spacing:0.4em; text-transform:uppercase; font-family:monospace; text-align:center; line-height:1.5; }
+.iv-col-label-die  { color:rgba(255,100,70,0.7); }
+.iv-col-label-live { color:rgba(80,190,255,0.7); }
+.iv-col-count { font-size:26px; font-weight:200; font-family:monospace; color:rgba(255,255,255,0.6); }
 .ip-lockout { font-size:9px; letter-spacing:0.35em; text-transform:uppercase; color:rgba(255,90,90,0.5); text-align:center; font-family:monospace; }
 </style>
 <div id="ip-wrap">
@@ -370,9 +379,24 @@ body {
     <button id="ip-send-btn" disabled>SEND</button>
   </div>
   <div id="ip-voted">
-    <div class="ip-site-title">Clifford Universe</div>
-    <div class="ip-timer-row">session will reset in <span class="ip-timer-val" id="ip-t1">—</span></div>
-    <div class="ip-split-bar"><div id="ip-split-a" class="ip-split-a" style="width:50%"></div><div class="ip-split-b"></div></div>
+    <div class="iv-timer-section">
+      <div class="iv-timer-label">session resets in</div>
+      <div id="ip-t1" class="iv-timer-val">—</div>
+    </div>
+    <div class="iv-chart">
+      <div class="iv-col">
+        <div class="iv-pct" id="iv-die-pct"></div>
+        <div class="iv-bar-wrap"><div class="iv-bar iv-bar-die" id="iv-bar-die" style="height:0%"></div></div>
+        <div class="iv-col-label iv-col-label-die">DIE AS<br>ONE</div>
+        <div class="iv-col-count" id="iv-die-count">0</div>
+      </div>
+      <div class="iv-col">
+        <div class="iv-pct" id="iv-live-pct"></div>
+        <div class="iv-bar-wrap"><div class="iv-bar iv-bar-live" id="iv-bar-live" style="height:0%"></div></div>
+        <div class="iv-col-label iv-col-label-live">LIVE AS<br>ALL</div>
+        <div class="iv-col-count" id="iv-live-count">0</div>
+      </div>
+    </div>
     <div id="ip-lockout-msg"></div>
   </div>
 </div>`;
@@ -419,9 +443,18 @@ body {
         const ti=document.getElementById('ip-timer-inline'), t1=document.getElementById('ip-t1');
         if(ti) ti.textContent=fmt; if(t1) t1.textContent=fmt;
         if(st.die!==undefined) {
-          const tot=(st.die+st.live)||1;
-          const bar=document.getElementById('ip-split-a');
-          if(bar) bar.style.width=(st.die/tot*100)+'%';
+          const die=st.die||0, live=st.live||0, tot=die+live||1;
+          const diePct=Math.round(die/tot*100), livePct=Math.round(live/tot*100);
+          const hasVotes = die+live > 0;
+          const bd=document.getElementById('iv-bar-die'),   bl=document.getElementById('iv-bar-live');
+          const pd=document.getElementById('iv-die-pct'),   pl=document.getElementById('iv-live-pct');
+          const cd=document.getElementById('iv-die-count'), cl=document.getElementById('iv-live-count');
+          if(bd) bd.style.height=diePct+'%';
+          if(bl) bl.style.height=livePct+'%';
+          if(pd) pd.textContent=hasVotes?diePct+'%':'';
+          if(pl) pl.textContent=hasVotes?livePct+'%':'';
+          if(cd) cd.textContent=die;
+          if(cl) cl.textContent=live;
         }
         if(st.phase==='lockout'||st.phase==='chaos'||st.phase==='result') {
           const f=document.getElementById('ip-field'), b=document.getElementById('ip-send-btn');
