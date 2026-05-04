@@ -287,13 +287,11 @@ body {
   align-items:center; gap:12px; background:rgba(255,255,255,0.04);
   border:1px solid rgba(255,255,255,0.1); transition:box-shadow 0.3s, border-color 0.3s;
 }
-#ip-card.active { border-color:transparent; box-shadow:0 0 0 1.5px hsl(var(--wh),var(--ws),var(--wl)); }
 .ip-card-label { font-size:10px; letter-spacing:0.5em; text-transform:uppercase; color:rgba(255,255,255,0.3); }
 #ip-field {
   width:100%; background:transparent; border:0; outline:none; text-align:center;
   letter-spacing:0.35em; font-size:30px; font-weight:200; text-transform:uppercase; color:#fff;
 }
-#ip-field.has-word { color:hsl(var(--wh),var(--ws),var(--wl)); }
 #ip-field::placeholder { font-size:11px; letter-spacing:0.2em; color:rgba(255,255,255,0.25); font-weight:300; }
 .ip-color-hint { font-size:10px; letter-spacing:0.3em; font-family:monospace; color:rgba(255,255,255,0.3); height:14px; text-align:center; }
 .ip-fate-row {
@@ -301,24 +299,21 @@ body {
   font-size:11px; letter-spacing:0.4em; text-transform:uppercase; color:rgba(255,255,255,0.3);
 }
 .ip-fate-dot { width:4px; height:4px; border-radius:50%; background:rgba(255,255,255,0.25); flex-shrink:0; }
-#ip-timer-inline { font-family:monospace; transition:color 0.3s; }
-#ip-timer-inline.has-word { color:hsl(var(--wh),var(--ws),var(--wl)); }
+#ip-timer-inline { font-family:monospace; }
 .ip-choices { display:flex; flex-direction:column; gap:12px; }
 .ip-choice {
   cursor:pointer; display:flex; align-items:center; gap:16px;
   border-radius:16px; border:1px solid rgba(255,255,255,0.1); padding:20px;
-  background:rgba(255,255,255,0.02); transition:border-color 0.2s, background 0.2s, box-shadow 0.2s;
+  background:rgba(255,255,255,0.02); transition:border-color 0.2s, background 0.2s;
 }
 .ip-choice:hover:not(.selected) { background:rgba(255,255,255,0.05); }
 .ip-choice.selected { background:rgba(255,255,255,0.06); border-color:rgba(255,255,255,0.4); }
-.ip-choice.selected.has-word { border-color:transparent; box-shadow:0 0 0 1.5px hsl(var(--wh),var(--ws),var(--wl)); }
 .ip-radio {
   width:16px; height:16px; min-width:16px; border-radius:50%;
   border:1px solid rgba(255,255,255,0.3); display:flex; align-items:center; justify-content:center;
   flex-shrink:0; transition:border-color 0.2s, background 0.2s;
 }
 .ip-choice.selected .ip-radio { border-color:#fff; background:#fff; }
-.ip-choice.selected.has-word .ip-radio { background:hsl(var(--wh),var(--ws),var(--wl)); border-color:hsl(var(--wh),var(--ws),var(--wl)); }
 .ip-radio-dot { width:6px; height:6px; border-radius:50%; background:#000; opacity:0; transition:opacity 0.15s; }
 .ip-choice.selected .ip-radio-dot { opacity:1; }
 .ip-choice-texts { display:flex; flex-direction:column; gap:2px; }
@@ -345,12 +340,11 @@ body {
   <div id="ip-entry">
     <header class="ip-header">
       <p class="ip-site-title">CLIFFORD UNIVERSE</p>
-      <p class="ip-site-desc">Enter a word to shape your universe.</p>
+      <p class="ip-site-desc">Enter a word to calculate its unique visual identity.</p>
     </header>
     <section id="ip-card">
       <label class="ip-card-label" for="ip-field">YOUR WORD</label>
       <input id="ip-field" type="text" placeholder="TYPE HERE" maxlength="16" autocomplete="off" spellcheck="false" autofocus>
-      <div id="ip-color-hint" class="ip-color-hint">&nbsp;</div>
     </section>
     <div class="ip-fate-row">
       <span>CHOOSE ITS FATE</span>
@@ -362,14 +356,14 @@ body {
         <div class="ip-radio"><div class="ip-radio-dot"></div></div>
         <div class="ip-choice-texts">
           <span class="ip-choice-title">DIE AS ONE</span>
-          <span class="ip-choice-sub">A single spark. No trace.</span>
+          <span class="ip-choice-sub">Own your void and leave no trace.</span>
         </div>
       </div>
       <div class="ip-choice" data-val="live">
         <div class="ip-radio"><div class="ip-radio-dot"></div></div>
         <div class="ip-choice-texts">
           <span class="ip-choice-title">LIVE AS ALL</span>
-          <span class="ip-choice-sub">Transcend into the nebula.</span>
+          <span class="ip-choice-sub">Transcend and keep on.</span>
         </div>
       </div>
     </div>
@@ -383,57 +377,19 @@ body {
   </div>
 </div>`;
 
-  // djb2 hash + HSL→hex (matches display side)
-  function djb2(str) { let h=5381; for(let i=0;i<str.length;i++) h=((h<<5)+h+str.charCodeAt(i))>>>0; return h; }
-  function hslToHex(h,s,l) {
-    s/=100; l/=100;
-    const k=n=>(n+h/30)%12, a=s*Math.min(l,1-l);
-    const f=n=>l-a*Math.max(-1,Math.min(k(n)-3,Math.min(9-k(n),1)));
-    const x=n=>Math.round(f(n)*255).toString(16).padStart(2,'0');
-    return ('#'+x(0)+x(8)+x(4)).toUpperCase();
-  }
-
   let selectedVote = null;
   function fmtT(s) { s=Math.max(0,Math.ceil(s)); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
-
-  function updateWordStyle() {
-    const val = (document.getElementById('ip-field').value||'').trim();
-    const hasWord = val.length > 0;
-    if (hasWord) {
-      const h = djb2(val.toLowerCase());
-      const hue = h % 360, sat = 65+(h%25), light = 55+((h>>8)%12);
-      document.body.style.setProperty('--wh', hue);
-      document.body.style.setProperty('--ws', sat+'%');
-      document.body.style.setProperty('--wl', light+'%');
-      const hint = document.getElementById('ip-color-hint');
-      if (hint) hint.textContent = hslToHex(hue,sat,light)+' \u00B7 h '+hue+'\u00B0 \u00B7 s '+sat+'%';
-      document.getElementById('ip-field').classList.add('has-word');
-      document.getElementById('ip-card').classList.add('active');
-      document.getElementById('ip-timer-inline').classList.add('has-word');
-      document.querySelectorAll('.ip-choice.selected').forEach(c => c.classList.add('has-word'));
-    } else {
-      const hint = document.getElementById('ip-color-hint');
-      if (hint) hint.innerHTML = '&nbsp;';
-      document.getElementById('ip-field').classList.remove('has-word');
-      document.getElementById('ip-card').classList.remove('active');
-      document.getElementById('ip-timer-inline').classList.remove('has-word');
-      document.querySelectorAll('.ip-choice').forEach(c => c.classList.remove('has-word'));
-    }
-    checkReady();
-  }
 
   function checkReady() {
     const word = (document.getElementById('ip-field').value||'').trim();
     document.getElementById('ip-send-btn').disabled = !(word && selectedVote);
   }
 
-  document.getElementById('ip-field').addEventListener('input', updateWordStyle);
+  document.getElementById('ip-field').addEventListener('input', checkReady);
   document.querySelectorAll('.ip-choice').forEach(el => {
     el.addEventListener('click', () => {
-      document.querySelectorAll('.ip-choice').forEach(c => c.classList.remove('selected','has-word'));
+      document.querySelectorAll('.ip-choice').forEach(c => c.classList.remove('selected'));
       el.classList.add('selected');
-      const hasWord = (document.getElementById('ip-field').value||'').trim().length > 0;
-      if (hasWord) el.classList.add('has-word');
       selectedVote = el.dataset.val;
       checkReady();
     });
