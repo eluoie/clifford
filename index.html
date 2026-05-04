@@ -194,6 +194,19 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
   border-left: 1px solid rgba(255, 255, 255, 0.08);
   padding-left: 14px;
 }
+.info-cursor {
+  display: inline-block;
+  width: 1px;
+  height: 0.85em;
+  background: rgba(255, 255, 255, 0.35);
+  margin-left: 2px;
+  vertical-align: middle;
+  animation: cursor-blink 0.85s step-end infinite;
+}
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
 
 /* ── White flash ──────────────────────────────────────────────────────────── */
 #white-flash {
@@ -236,7 +249,7 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
 
 
 <!-- ── Info overlay boxes ────────────────────────────────────────────────── -->
-<div id="info-box"><p id="info-text"></p></div>
+<div id="info-box"><p id="info-text"><span class="info-cursor"></span></p></div>
 
 <!-- ── White flash ───────────────────────────────────────────────────────── -->
 <div id="white-flash"></div>
@@ -2171,9 +2184,18 @@ function tickInfoBox() {
   const wasVisible = box.classList.contains('info-visible');
 
   const show = () => {
-    txt.textContent = entry.text;
     box.classList.add('info-visible');
     _infoTransitioning = false;
+    // Typing animation
+    let i = 0;
+    const cursor = document.createElement('span');
+    cursor.className = 'info-cursor';
+    txt.textContent = '';
+    txt.appendChild(cursor);
+    const iv = setInterval(() => {
+      cursor.insertAdjacentText('beforebegin', entry.text[i++]);
+      if (i >= entry.text.length) clearInterval(iv);
+    }, 12);
   };
 
   if (wasVisible) {
