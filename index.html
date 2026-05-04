@@ -190,7 +190,7 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
   font-weight: 400;
   letter-spacing: 0.12em;
   line-height: 1.9;
-  color: rgba(255, 255, 255, 0.28);
+  color: rgba(255, 255, 255, 0.58);
   border-left: 1px solid rgba(255, 255, 255, 0.08);
   padding-left: 14px;
 }
@@ -2177,12 +2177,12 @@ document.addEventListener('keydown', e => {
 
 // ── Info overlay boxes ────────────────────────────────────────────────────────
 const INFO_ENTRIES = [
-  { at: 10,  text: 'The Recursive Loop: The Clifford Attractor emerges from the elegant repetition of simple trigonometric laws applied to a single point. By feeding the output of these equations back into themselves, a recursive feedback loop transforms numbers into a dynamic coordinate system.' },
-  { at: 40,  text: 'Mathematical Tethering: Every new point in the sequence is mathematically tethered to its predecessor, creating a continuous trail through digital space. This process slowly builds a vast, unfolding architecture of light and shadow from four static numerical parameters.' },
-  { at: 70,  text: 'Deterministic Chaos: Within these digital forms lies the fascinating paradox of deterministic chaos, where simple rules create unpredictable beauty. While the underlying equations are entirely fixed, the resulting structures oscillate between perfect symmetry and turbulent complexity.' },
-  { at: 100, text: 'Ethereal Densities: These patterns are not "drawn" in the traditional sense, but are instead attracted to specific regions of a mathematical landscape. This creates ethereal, smoke-like densities where the system visits certain coordinates more frequently than others, revealing hidden layers of intensity.' },
-  { at: 130, text: 'The Collapse of Variety: Not every journey through this mathematical space leads to complexity; sometimes the system falls into a rhythmic trap called periodicity. In these moments, the infinite variety collapses into a few repeating points, creating a visual heartbeat that pulses on a single, stagnant frequency.' },
-  { at: 160, text: 'The Edge of Order: The true art of the attractor is found at the fragile edge where rigid order meets total randomness. It is in this narrow boundary that the system avoids collapse and produces the most intricate, fractal-like structures imaginable.' },
+  { at: 13,  text: 'The Recursive Loop: The Clifford Attractor emerges from the elegant repetition of simple trigonometric laws applied to a single point. By feeding the output of these equations back into themselves, a recursive feedback loop transforms numbers into a dynamic coordinate system.' },
+  { at: 52,  text: 'Mathematical Tethering: Every new point in the sequence is mathematically tethered to its predecessor, creating a continuous trail through digital space. This process slowly builds a vast, unfolding architecture of light and shadow from four static numerical parameters.' },
+  { at: 83,  text: 'Deterministic Chaos: Within these digital forms lies the fascinating paradox of deterministic chaos, where simple rules create unpredictable beauty. While the underlying equations are entirely fixed, the resulting structures oscillate between perfect symmetry and turbulent complexity.' },
+  { at: 118, text: 'Ethereal Densities: These patterns are not "drawn" in the traditional sense, but are instead attracted to specific regions of a mathematical landscape. This creates ethereal, smoke-like densities where the system visits certain coordinates more frequently than others, revealing hidden layers of intensity.' },
+  { at: 145, text: 'The Collapse of Variety: Not every journey through this mathematical space leads to complexity; sometimes the system falls into a rhythmic trap called periodicity. In these moments, the infinite variety collapses into a few repeating points, creating a visual heartbeat that pulses on a single, stagnant frequency.' },
+  { at: 168, text: 'The Edge of Order: The true art of the attractor is found at the fragile edge where rigid order meets total randomness. It is in this narrow boundary that the system avoids collapse and produces the most intricate, fractal-like structures imaginable.' },
 ];
 let _infoIdx = 0;
 let _infoTransitioning = false;
@@ -2212,7 +2212,7 @@ function tickInfoBox() {
     const iv = setInterval(() => {
       cursor.insertAdjacentText('beforebegin', entry.text[i++]);
       if (i >= entry.text.length) clearInterval(iv);
-    }, 12);
+    }, 62);
   };
 
   if (wasVisible) {
