@@ -34,23 +34,28 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
 
 /* ── Sequence overlay ─────────────────────────────────────────────────────── */
 #seq-overlay {
-  position: fixed; inset: 0; z-index: 40;
-  background: rgba(0,0,0,0.92);
-  backdrop-filter: blur(3px);
+  position: fixed; top: 24px; left: 24px;
+  width: 520px; height: 300px;
+  z-index: 40;
+  background: rgba(0,0,0,0.88);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
   display: none;
   opacity: 0;
   transition: opacity 0.9s ease;
   flex-direction: row;
+  overflow: hidden;
 }
 
 #seq-left {
   flex: 1;
   display: flex; align-items: center; justify-content: center;
-  padding: 60px 40px 60px 80px;
+  padding: 16px;
   position: relative;
 }
 
-/* Name display — large, centred in left panel */
+/* Name display — centred in left panel */
 #seq-name {
   font-weight: 200;
   letter-spacing: 0.38em;
@@ -97,10 +102,10 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
 
 /* Right column — calculation panels */
 #seq-right {
-  width: 400px;
+  width: 220px;
   display: flex; flex-direction: column; justify-content: center;
-  gap: 16px;
-  padding: 40px 44px 40px 20px;
+  gap: 8px;
+  padding: 14px 14px 14px 10px;
   border-left: 1px solid rgba(255,255,255,0.07);
   overflow-y: auto;
 }
@@ -109,25 +114,25 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
 .calc-panel {
   background: rgba(255,255,255,0.03);
   border: 1px solid rgba(255,255,255,0.07);
-  border-radius: 10px;
-  padding: 18px 20px;
+  border-radius: 8px;
+  padding: 10px 12px;
   opacity: 0;
   transition: opacity 0.4s ease;
 }
 .calc-panel.visible { opacity: 1; }
 
 .calc-title {
-  font-size: 8px;
+  font-size: 7px;
   letter-spacing: 0.35em;
   text-transform: uppercase;
   color: rgba(255,255,255,0.35);
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   font-family: monospace;
 }
 .calc-body {
   font-family: monospace;
-  font-size: 11px;
-  line-height: 1.8;
+  font-size: 9px;
+  line-height: 1.6;
   color: rgba(255,255,255,0.7);
   white-space: pre;
 }
@@ -540,9 +545,9 @@ async function runSequence(name, sig, params) {
   nameEl.classList.toggle('vertical', vertical);
   let fs;
   if (vertical) {
-    fs = Math.max(28, Math.min(78, Math.floor(300 / n)));
+    fs = Math.max(14, Math.min(36, Math.floor(140 / n)));
   } else {
-    fs = Math.max(30, Math.min(90, Math.floor(640 / (n * 1.42))));
+    fs = Math.max(16, Math.min(42, Math.floor(220 / (n * 1.42))));
   }
   nameEl.style.fontSize      = fs + 'px';
   nameEl.style.letterSpacing = n > 8 ? '0.28em' : '0.4em';
@@ -576,17 +581,17 @@ async function runSequence(name, sig, params) {
 
   const hexDisp = document.createElement('div');
   hexDisp.textContent = sig.hex;
-  hexDisp.style.cssText = `font-size:20px;font-weight:600;letter-spacing:0.12em;
-    color:${sig.hex};font-family:monospace;margin-bottom:5px;`;
+  hexDisp.style.cssText = `font-size:13px;font-weight:600;letter-spacing:0.12em;
+    color:${sig.hex};font-family:monospace;margin-bottom:4px;`;
 
   const hslDisp = document.createElement('div');
   hslDisp.textContent = `hue ${sig.hue}°  ·  sat ${sig.sat}%  ·  light ${sig.light}%`;
-  hslDisp.style.cssText = `font-size:9px;letter-spacing:0.1em;color:rgba(255,255,255,0.38);
-    font-family:monospace;margin-bottom:10px;`;
+  hslDisp.style.cssText = `font-size:7px;letter-spacing:0.1em;color:rgba(255,255,255,0.38);
+    font-family:monospace;margin-bottom:6px;`;
 
   const nameDisp = document.createElement('div');
   nameDisp.textContent = sig.clean;
-  nameDisp.style.cssText = `font-size:15px;font-weight:300;letter-spacing:0.5em;
+  nameDisp.style.cssText = `font-size:10px;font-weight:300;letter-spacing:0.5em;
     color:${sig.hex};font-family:'Helvetica Neue',Helvetica,sans-serif;`;
 
   sep.appendChild(hexDisp);
