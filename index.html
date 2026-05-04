@@ -2095,7 +2095,10 @@ function resetSession() {
   } catch(e) { console.warn('MQTT init failed:', e); }
 })();
 
-document.addEventListener('keydown', e => { if (e.shiftKey && e.key === 'Backspace') { e.preventDefault(); clearAll(); } });
+document.addEventListener('keydown', e => {
+  if (e.shiftKey && e.key === 'Backspace') { e.preventDefault(); clearAll(); }
+  if (e.shiftKey && e.key === 'T') { e.preventDefault(); sessionElapsed = Math.min(sessionElapsed, 240); }
+});
 
 // ── Render loop ───────────────────────────────────────────────────────────────
 const clock = new THREE.Clock();
