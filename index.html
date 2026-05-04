@@ -883,12 +883,6 @@ class NameWave {
       }
     }
 
-    // ── Age fade (after 5 min) ────────────────────────────────────────────────
-    if (this.age > 300) {
-      const a = Math.max(0, 1 - (this.age - 300) / 60);
-      this.mat.opacity = 0.65 * a; this.mat2.opacity = 0.16 * a; this.orbMat.opacity = 0.13 * a;
-      if (a <= 0) this.dead = true;
-    }
   }
 
   // ── Energy exchange ───────────────────────────────────────────────────────
@@ -1239,7 +1233,6 @@ async function spawnName(name) {
   const id   = nameIdCnt++;
   const wave = new NameWave(name, id, true);
   nameWaves.push(wave);
-  while (nameWaves.length > 10) nameWaves.shift().destroy();
   
 
   // Overlay runs AFTER — wave already visible behind it
