@@ -2172,7 +2172,7 @@ function resetSession() {
 
 document.addEventListener('keydown', e => {
   if (e.shiftKey && e.key === 'Backspace') { e.preventDefault(); clearAll(); }
-  if (e.shiftKey && e.key === 'T') { e.preventDefault(); sessionElapsed = Math.min(sessionElapsed, 240); }
+  if (e.shiftKey && e.key === 'T') { e.preventDefault(); sessionElapsed = 240; }
 });
 
 // ── Info overlay boxes ────────────────────────────────────────────────────────
