@@ -294,12 +294,11 @@ body {
 }
 #ip-field::placeholder { font-size:11px; letter-spacing:0.2em; color:rgba(255,255,255,0.25); font-weight:300; }
 .ip-color-hint { font-size:10px; letter-spacing:0.3em; font-family:monospace; color:rgba(255,255,255,0.3); height:14px; text-align:center; }
-.ip-fate-row {
-  display:flex; align-items:center; justify-content:center; gap:12px;
-  font-size:11px; letter-spacing:0.4em; text-transform:uppercase; color:rgba(255,255,255,0.3);
+.ip-fate-label {
+  font-size:12px; font-weight:300; color:rgba(255,255,255,0.45);
+  text-align:center; white-space:nowrap;
 }
-.ip-fate-dot { width:4px; height:4px; border-radius:50%; background:rgba(255,255,255,0.25); flex-shrink:0; }
-#ip-timer-inline { font-family:monospace; }
+#ip-timer-inline { font-family:monospace; color:rgba(255,255,255,0.75); }
 .ip-choices { display:flex; flex-direction:column; gap:12px; }
 .ip-choice {
   cursor:pointer; display:flex; align-items:center; gap:16px;
@@ -349,30 +348,26 @@ body {
   <div id="ip-entry">
     <header class="ip-header">
       <p class="ip-site-title">CLIFFORD UNIVERSE</p>
-      <p class="ip-site-desc">Enter a word to calculate its unique visual identity.</p>
+      <p class="ip-site-desc">calculating words into visual identities</p>
     </header>
     <section id="ip-card">
       <label class="ip-card-label" for="ip-field">YOUR WORD</label>
       <input id="ip-field" type="text" placeholder="TYPE HERE" maxlength="16" autocomplete="off" spellcheck="false" autofocus>
     </section>
-    <div class="ip-fate-row">
-      <span>CHOOSE ITS FATE</span>
-      <span class="ip-fate-dot"></span>
-      <span id="ip-timer-inline">—</span>
-    </div>
+    <div class="ip-fate-label">Session restarts in <span id="ip-timer-inline">—</span>. Choose its fate:</div>
     <div class="ip-choices">
       <div class="ip-choice" data-val="die">
         <div class="ip-radio"><div class="ip-radio-dot"></div></div>
         <div class="ip-choice-texts">
-          <span class="ip-choice-title">DIE AS ONE</span>
-          <span class="ip-choice-sub">Own your void and leave no trace.</span>
+          <span class="ip-choice-title">PURGE</span>
+          <span class="ip-choice-sub">Autonomy through erasure.</span>
         </div>
       </div>
       <div class="ip-choice" data-val="live">
         <div class="ip-radio"><div class="ip-radio-dot"></div></div>
         <div class="ip-choice-texts">
-          <span class="ip-choice-title">LIVE AS ALL</span>
-          <span class="ip-choice-sub">Transcend and keep on.</span>
+          <span class="ip-choice-title">MERGE</span>
+          <span class="ip-choice-sub">Eternity through fusion.</span>
         </div>
       </div>
     </div>
