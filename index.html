@@ -172,6 +172,29 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
 #timer-el.urgent .t-value { color: rgba(255,90,90,0.9); }
 
 
+/* ── Info overlay boxes ───────────────────────────────────────────────────── */
+#info-box {
+  position: fixed;
+  top: 32px;
+  right: 36px;
+  z-index: 20;
+  max-width: 380px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.9s ease;
+}
+#info-box.info-visible { opacity: 1; }
+#info-box p {
+  font-family: monospace;
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  line-height: 1.9;
+  color: rgba(255, 255, 255, 0.28);
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  padding-left: 14px;
+}
+
 /* ── White flash ──────────────────────────────────────────────────────────── */
 #white-flash {
   position: fixed; inset: 0; z-index: 100; background: #fff;
@@ -211,6 +234,9 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
   <div class="t-value" id="timer-value-el">0:30</div>
 </div>
 
+
+<!-- ── Info overlay boxes ────────────────────────────────────────────────── -->
+<div id="info-box"><p id="info-text"></p></div>
 
 <!-- ── White flash ───────────────────────────────────────────────────────── -->
 <div id="white-flash"></div>
@@ -2024,6 +2050,8 @@ function resetSession() {
   sessionElapsed = 0; sessionPhase = 'running';
   votesDie = 0; votesLive = 0; votedIds.clear();
   sessionChaosSpeed = 1; liveAsAllShake = 0; resultExecuted = false; broadcastAccum = 0;
+  _infoIdx = 0; _infoTransitioning = false;
+  const _ib = document.getElementById('info-box'); if (_ib) _ib.classList.remove('info-visible');
   updateSessionTimerEl(300);
 
   if (sw) {
@@ -2100,6 +2128,45 @@ document.addEventListener('keydown', e => {
   if (e.shiftKey && e.key === 'T') { e.preventDefault(); sessionElapsed = Math.min(sessionElapsed, 240); }
 });
 
+// ── Info overlay boxes ────────────────────────────────────────────────────────
+const INFO_ENTRIES = [
+  { at: 10,  text: 'The Recursive Loop: The Clifford Attractor emerges from the elegant repetition of simple trigonometric laws applied to a single point. By feeding the output of these equations back into themselves, a recursive feedback loop transforms numbers into a dynamic coordinate system.' },
+  { at: 40,  text: 'Mathematical Tethering: Every new point in the sequence is mathematically tethered to its predecessor, creating a continuous trail through digital space. This process slowly builds a vast, unfolding architecture of light and shadow from four static numerical parameters.' },
+  { at: 70,  text: 'Deterministic Chaos: Within these digital forms lies the fascinating paradox of deterministic chaos, where simple rules create unpredictable beauty. While the underlying equations are entirely fixed, the resulting structures oscillate between perfect symmetry and turbulent complexity.' },
+  { at: 100, text: 'Ethereal Densities: These patterns are not "drawn" in the traditional sense, but are instead attracted to specific regions of a mathematical landscape. This creates ethereal, smoke-like densities where the system visits certain coordinates more frequently than others, revealing hidden layers of intensity.' },
+  { at: 130, text: 'The Collapse of Variety: Not every journey through this mathematical space leads to complexity; sometimes the system falls into a rhythmic trap called periodicity. In these moments, the infinite variety collapses into a few repeating points, creating a visual heartbeat that pulses on a single, stagnant frequency.' },
+  { at: 160, text: 'The Edge of Order: The true art of the attractor is found at the fragile edge where rigid order meets total randomness. It is in this narrow boundary that the system avoids collapse and produces the most intricate, fractal-like structures imaginable.' },
+];
+let _infoIdx = 0;
+let _infoTransitioning = false;
+
+function tickInfoBox() {
+  if (_infoIdx >= INFO_ENTRIES.length || sessionElapsed > 180) return;
+  if (sessionElapsed < INFO_ENTRIES[_infoIdx].at) return;
+  if (_infoTransitioning) return;
+  _infoTransitioning = true;
+
+  const box = document.getElementById('info-box');
+  const txt = document.getElementById('info-text');
+  if (!box || !txt) { _infoTransitioning = false; return; }
+
+  const entry = INFO_ENTRIES[_infoIdx++];
+  const wasVisible = box.classList.contains('info-visible');
+
+  const show = () => {
+    txt.textContent = entry.text;
+    box.classList.add('info-visible');
+    _infoTransitioning = false;
+  };
+
+  if (wasVisible) {
+    box.classList.remove('info-visible');
+    setTimeout(show, 950);
+  } else {
+    show();
+  }
+}
+
 // ── Render loop ───────────────────────────────────────────────────────────────
 const clock = new THREE.Clock();
 let elapsed = 0, frame = 0, camAngle = 0;
@@ -2120,6 +2187,7 @@ let elapsed = 0, frame = 0, camAngle = 0;
     sessionChaosSpeed = 1;
   }
   updateSessionTimerEl(_remaining);
+  tickInfoBox();
   broadcastAccum += dt;
   if (broadcastAccum >= 1) { broadcastAccum = 0; broadcastSessionState(); }
 
