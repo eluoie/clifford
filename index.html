@@ -62,7 +62,7 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
   text-transform: uppercase;
   line-height: 1.1;
   transition: color 0.8s ease;
-  word-break: break-all;
+  white-space: nowrap;
   text-align: center;
 }
 #seq-name span {
@@ -159,10 +159,11 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
 #timer-el {
   position: fixed; top: 28px; left: 50%; transform: translateX(-50%);
   z-index: 30; display: none; text-align: center; pointer-events: none;
+  white-space: nowrap;
 }
 #timer-el .t-label {
-  font-size: 7px; letter-spacing: 0.5em; text-transform: uppercase;
-  color: rgba(255,255,255,0.22); font-family: monospace; margin-bottom: 4px;
+  font-size: 7px; letter-spacing: 0.4em; text-transform: uppercase;
+  color: rgba(255,255,255,0.22); font-family: monospace; margin-bottom: 6px;
 }
 #timer-el .t-value {
   font-size: 26px; font-weight: 200; letter-spacing: 0.35em; font-family: monospace;
@@ -172,9 +173,11 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
 
 /* ── Chaos vote chart (display overlay) ───────────────────────────────────── */
 #chaos-chart {
-  position: fixed; inset: 0; z-index: 32; display: none;
-  flex-direction: column; align-items: center; justify-content: center;
-  gap: 10px; pointer-events: none;
+  position: fixed; top: 0; left: 50%; transform: translateX(-50%);
+  z-index: 32; display: none;
+  flex-direction: column; align-items: center;
+  gap: 8px; pointer-events: none;
+  padding-top: 20px;
 }
 #chaos-chart.visible { display: flex; }
 .cc-row { display: flex; align-items: center; gap: 14px; }
@@ -223,7 +226,7 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
 
 <!-- ── Session timer ─────────────────────────────────────────────────────── -->
 <div id="timer-el">
-  <div class="t-label">session ends in</div>
+  <div class="t-label">session reset in</div>
   <div class="t-value" id="timer-value-el">0:30</div>
 </div>
 
@@ -651,16 +654,17 @@ async function runSequence(name, sig, params) {
   nameEl.innerHTML = clean.map(l => `<span>${l}</span>`).join(' ');
 
   const n = clean.length;
-  const vertical = n > 12;
-  nameEl.classList.toggle('vertical', vertical);
-  let fs;
-  if (vertical) {
-    fs = Math.max(14, Math.min(36, Math.floor(140 / n)));
-  } else {
-    fs = Math.max(16, Math.min(42, Math.floor(220 / (n * 1.42))));
+  nameEl.classList.remove('vertical');
+  nameEl.style.whiteSpace    = 'nowrap';
+  nameEl.style.letterSpacing = n > 6 ? '0.28em' : '0.4em';
+  // Auto-fit: start at max and step down until it fits the panel width
+  const maxW = document.getElementById('seq-left').clientWidth - 32;
+  let fs = 42;
+  nameEl.style.fontSize = fs + 'px';
+  while (fs > 9 && nameEl.scrollWidth > maxW) {
+    fs--;
+    nameEl.style.fontSize = fs + 'px';
   }
-  nameEl.style.fontSize      = fs + 'px';
-  nameEl.style.letterSpacing = n > 8 ? '0.28em' : '0.4em';
 
   await delay(50);
   overlay.style.opacity = '1';
