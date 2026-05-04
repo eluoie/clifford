@@ -269,87 +269,94 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 body { background:#000; color:#fff; min-height:100dvh; font-family:'Helvetica Neue',Helvetica,sans-serif; display:flex; align-items:center; justify-content:center; }
-#ip-wrap { display:flex; flex-direction:column; align-items:center; gap:22px; padding:40px 28px; width:100%; max-width:360px; }
+#ip-wrap { display:flex; flex-direction:column; align-items:center; gap:22px; padding:48px 28px; width:100%; max-width:360px; }
 .ip-title { font-size:9px; letter-spacing:0.5em; text-transform:uppercase; color:rgba(255,255,255,0.3); }
 .ip-desc { font-size:11px; font-weight:300; line-height:1.7; color:rgba(255,255,255,0.35); text-align:center; }
 #ip-field { width:100%; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12); border-radius:14px; padding:18px 22px; font-size:20px; font-weight:200; letter-spacing:0.3em; text-transform:uppercase; color:#fff; outline:none; text-align:center; transition:border-color 0.2s; }
 #ip-field:focus { border-color:rgba(255,255,255,0.35); }
 #ip-field::placeholder { font-size:11px; letter-spacing:0.2em; color:rgba(255,255,255,0.18); }
-.ip-btn { width:100%; padding:16px; border-radius:14px; border:none; background:#fff; color:#000; font-size:11px; letter-spacing:0.4em; text-transform:uppercase; cursor:pointer; transition:opacity 0.15s; }
-.ip-btn:active { opacity:0.8; }
-.ip-btn:disabled { opacity:0.3; cursor:default; }
-.ip-status { font-size:9px; letter-spacing:0.35em; text-transform:uppercase; color:rgba(255,255,255,0.35); min-height:14px; }
-.ip-timer-row { font-size:8px; letter-spacing:0.4em; text-transform:uppercase; font-family:monospace; color:rgba(255,255,255,0.2); text-align:center; }
-.ip-timer-val { color:rgba(255,255,255,0.55); }
-.ip-vote-heading { font-size:10px; letter-spacing:0.25em; text-transform:uppercase; color:rgba(255,255,255,0.38); text-align:center; line-height:1.7; }
+.ip-fate-label { font-size:8px; letter-spacing:0.4em; text-transform:uppercase; color:rgba(255,255,255,0.25); text-align:center; line-height:1.7; width:100%; }
+.ip-choices { display:flex; flex-direction:column; gap:10px; width:100%; }
 .ip-choice { width:100%; cursor:pointer; display:flex; align-items:flex-start; gap:14px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07); border-radius:12px; padding:16px 14px; transition:border-color 0.2s, background 0.2s; }
 .ip-choice.selected { border-color:rgba(255,255,255,0.3); background:rgba(255,255,255,0.07); }
-.ip-radio { width:15px; height:15px; min-width:15px; border-radius:50%; border:1px solid rgba(255,255,255,0.25); margin-top:2px; display:flex; align-items:center; justify-content:center; }
+.ip-radio { width:15px; height:15px; min-width:15px; border-radius:50%; border:1px solid rgba(255,255,255,0.25); margin-top:2px; display:flex; align-items:center; justify-content:center; transition:border-color 0.2s, background 0.2s; }
 .ip-choice.selected .ip-radio { border-color:#fff; background:#fff; }
-.ip-radio-dot { width:5px; height:5px; border-radius:50%; background:#000; opacity:0; }
+.ip-radio-dot { width:5px; height:5px; border-radius:50%; background:#000; opacity:0; transition:opacity 0.15s; }
 .ip-choice.selected .ip-radio-dot { opacity:1; }
 .ip-choice-title { font-size:11px; letter-spacing:0.4em; text-transform:uppercase; margin-bottom:5px; }
 .ip-choice-desc { font-size:11px; font-weight:300; line-height:1.6; color:rgba(255,255,255,0.38); }
-.ip-bar-section { width:100%; display:flex; flex-direction:column; gap:12px; }
-.ip-bar-title { font-size:8px; letter-spacing:0.45em; text-transform:uppercase; color:rgba(255,255,255,0.2); text-align:center; font-family:monospace; }
-.ip-bar-row { display:flex; align-items:center; gap:10px; }
-.ip-bar-label { font-size:8px; letter-spacing:0.2em; text-transform:uppercase; font-family:monospace; color:rgba(255,255,255,0.35); width:76px; flex-shrink:0; }
-.ip-bar-outer { flex:1; height:2px; background:rgba(255,255,255,0.09); border-radius:1px; overflow:hidden; }
-.ip-bar-inner { height:100%; background:rgba(255,255,255,0.7); border-radius:1px; transition:width 0.4s ease; width:0%; }
-.ip-bar-count { font-size:9px; font-family:monospace; color:rgba(255,255,255,0.25); width:18px; text-align:right; }
-.ip-lockout { font-size:9px; letter-spacing:0.35em; text-transform:uppercase; color:rgba(255,90,90,0.55); text-align:center; font-family:monospace; }
+#ip-send-btn { width:100%; padding:16px; border-radius:14px; border:none; background:#fff; color:#000; font-size:11px; letter-spacing:0.4em; text-transform:uppercase; cursor:pointer; transition:opacity 0.15s; }
+#ip-send-btn:active { opacity:0.8; }
+#ip-send-btn:disabled { opacity:0.3; cursor:default; }
+/* After-vote screen */
+#ip-voted { display:none; flex-direction:column; align-items:center; gap:28px; width:100%; }
+.ip-timer-row { font-size:8px; letter-spacing:0.4em; text-transform:uppercase; font-family:monospace; color:rgba(255,255,255,0.2); text-align:center; }
+.ip-timer-val { color:rgba(255,255,255,0.55); }
+.ip-split-bar { width:100%; height:2px; border-radius:1px; overflow:hidden; background:rgba(255,255,255,0.08); display:flex; }
+.ip-split-a { height:100%; background:rgba(255,255,255,0.75); transition:width 0.5s ease; }
+.ip-split-b { height:100%; background:rgba(255,255,255,0.22); flex:1; }
+.ip-lockout { font-size:9px; letter-spacing:0.35em; text-transform:uppercase; color:rgba(255,90,90,0.5); text-align:center; font-family:monospace; }
 </style>
 <div id="ip-wrap">
-  <div id="ip-s1">
-    <div class="ip-title" style="margin-bottom:22px">Clifford Universe</div>
-    <div class="ip-desc" style="margin-bottom:22px">Any word you enter is run through a djb2 hash function, generating a unique integer that maps to an HSL color and seeds four Clifford attractor parameters, producing a unique shape that exists for that word alone.</div>
+  <!-- Entry + vote on one screen -->
+  <div id="ip-entry" style="display:flex;flex-direction:column;align-items:center;gap:22px;width:100%">
+    <div class="ip-title">Clifford Universe</div>
+    <div class="ip-desc">Any word you enter is run through a djb2 hash function, generating a unique integer that maps to an HSL color and seeds four Clifford attractor parameters, producing a unique shape that exists for that word alone.</div>
     <input id="ip-field" type="text" placeholder="Your Clifford" maxlength="18" autocomplete="off" spellcheck="false" autofocus>
-    <div style="height:22px"></div>
-    <button id="ip-send-btn" class="ip-btn">Send</button>
-    <div style="height:8px"></div>
-    <div id="ip-send-status" class="ip-status"></div>
+    <div class="ip-fate-label">Session will reset in <span class="ip-timer-val" id="ip-t0">—</span><br>Determine the fate of your Clifford Attractor:</div>
+    <div class="ip-choices">
+      <div class="ip-choice" data-val="die">
+        <div class="ip-radio"><div class="ip-radio-dot"></div></div>
+        <div><div class="ip-choice-title">Die as One</div><div class="ip-choice-desc">Go out as a single spark. Own your void and leave no trace.</div></div>
+      </div>
+      <div class="ip-choice" data-val="live">
+        <div class="ip-radio"><div class="ip-radio-dot"></div></div>
+        <div><div class="ip-choice-title">Live as All</div><div class="ip-choice-desc">Transcend within the collective nebula and live through the next session.</div></div>
+      </div>
+    </div>
+    <button id="ip-send-btn" disabled>Send</button>
   </div>
-  <div id="ip-s2" style="display:none;flex-direction:column;align-items:center;gap:20px;width:100%">
+  <!-- After vote -->
+  <div id="ip-voted">
+    <div class="ip-title">Clifford Universe</div>
     <div class="ip-timer-row">Session will reset in <span class="ip-timer-val" id="ip-t1">—</span></div>
-    <div class="ip-vote-heading">Determine the fate of your Clifford Attractor:</div>
-    <div id="ip-choice-die" class="ip-choice" data-val="die">
-      <div class="ip-radio"><div class="ip-radio-dot"></div></div>
-      <div><div class="ip-choice-title">Die as One</div><div class="ip-choice-desc">Go out as a single spark. Own your void and leave no trace.</div></div>
-    </div>
-    <div id="ip-choice-live" class="ip-choice" data-val="live">
-      <div class="ip-radio"><div class="ip-radio-dot"></div></div>
-      <div><div class="ip-choice-title">Live as All</div><div class="ip-choice-desc">Transcend within the collective nebula and live through the next session.</div></div>
-    </div>
-    <button id="ip-vote-btn" class="ip-btn" disabled>Submit Vote</button>
-    <div id="ip-vote-status" class="ip-status"></div>
-  </div>
-  <div id="ip-s3" style="display:none;flex-direction:column;align-items:center;gap:20px;width:100%">
-    <div class="ip-timer-row">Session will reset in <span class="ip-timer-val" id="ip-t2">—</span></div>
-    <div class="ip-bar-section">
-      <div class="ip-bar-title">live vote</div>
-      <div class="ip-bar-row"><div class="ip-bar-label">Die as One</div><div class="ip-bar-outer"><div id="ip-die-bar" class="ip-bar-inner"></div></div><div id="ip-die-count" class="ip-bar-count">0</div></div>
-      <div class="ip-bar-row"><div class="ip-bar-label">Live as All</div><div class="ip-bar-outer"><div id="ip-live-bar" class="ip-bar-inner"></div></div><div id="ip-live-count" class="ip-bar-count">0</div></div>
-    </div>
+    <div class="ip-split-bar"><div id="ip-split-a" class="ip-split-a" style="width:50%"></div><div class="ip-split-b"></div></div>
     <div id="ip-lockout-msg"></div>
   </div>
 </div>`;
 
   let selectedVote = null;
-  function showStep(n) {
-    ['ip-s1','ip-s2','ip-s3'].forEach((id,i) => {
-      const el = document.getElementById(id);
-      el.style.display = (i+1 === n) ? (n===1?'block':'flex') : 'none';
-    });
-  }
   function fmtT(s) { s=Math.max(0,Math.ceil(s)); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
-  function updatePhoneBars(die,live) {
-    const tot = die+live||1;
-    const db=document.getElementById('ip-die-bar'), lb=document.getElementById('ip-live-bar');
-    const dc=document.getElementById('ip-die-count'), lc=document.getElementById('ip-live-count');
-    if(db) db.style.width=(die/tot*100)+'%'; if(lb) lb.style.width=(live/tot*100)+'%';
-    if(dc) dc.textContent=die; if(lc) lc.textContent=live;
-  }
 
+  // Vote selection — enable Send only when both field and vote are ready
+  function checkReady() {
+    const word = (document.getElementById('ip-field').value||'').trim();
+    document.getElementById('ip-send-btn').disabled = !(word && selectedVote);
+  }
+  document.getElementById('ip-field').addEventListener('input', checkReady);
+  document.querySelectorAll('.ip-choice').forEach(el => {
+    el.addEventListener('click', () => {
+      document.querySelectorAll('.ip-choice').forEach(c => c.classList.remove('selected'));
+      el.classList.add('selected');
+      selectedVote = el.dataset.val;
+      checkReady();
+    });
+  });
+
+  // Send: publish word + vote together, then show bar
+  document.getElementById('ip-send-btn').addEventListener('click', () => {
+    const word = (document.getElementById('ip-field').value||'').trim();
+    if (!word || !selectedVote) return;
+    document.getElementById('ip-send-btn').disabled = true;
+    if (phoneMqtt) {
+      phoneMqtt.publish('clifford/'+topic, word);
+      phoneMqtt.publish('clifford/'+topic+'/vote', JSON.stringify({voterId, choice:selectedVote}));
+    }
+    document.getElementById('ip-entry').style.display = 'none';
+    document.getElementById('ip-voted').style.display = 'flex';
+  });
+
+  // MQTT for state updates
   let phoneMqtt;
   try { phoneMqtt = mqtt.connect('wss://broker.hivemq.com:8884/mqtt'); } catch(e) {}
   if (phoneMqtt) {
@@ -358,47 +365,22 @@ body { background:#000; color:#fff; min-height:100dvh; font-family:'Helvetica Ne
       try {
         const st = JSON.parse(buf.toString());
         const fmt = fmtT(st.timer||0);
-        const t1=document.getElementById('ip-t1'), t2=document.getElementById('ip-t2');
-        if(t1) t1.textContent=fmt; if(t2) t2.textContent=fmt;
-        if(st.die!==undefined) updatePhoneBars(st.die, st.live);
+        const t0=document.getElementById('ip-t0'), t1=document.getElementById('ip-t1');
+        if(t0) t0.textContent=fmt; if(t1) t1.textContent=fmt;
+        if(st.die!==undefined) {
+          const tot=st.die+st.live||1;
+          const bar=document.getElementById('ip-split-a');
+          if(bar) bar.style.width=(st.die/tot*100)+'%';
+        }
         if(st.phase==='lockout'||st.phase==='chaos'||st.phase==='result') {
           const f=document.getElementById('ip-field'), b=document.getElementById('ip-send-btn');
           if(f) f.disabled=true; if(b) b.disabled=true;
           const lk=document.getElementById('ip-lockout-msg');
-          if(lk){lk.className='ip-lockout';lk.textContent='session is ending — no new entries';}
+          if(lk){lk.className='ip-lockout';lk.textContent='session is ending';}
         }
       } catch(_) {}
     });
   }
-
-  // Step 1: send word
-  function sendWord() {
-    const word = (document.getElementById('ip-field').value||'').trim();
-    if (!word) return;
-    document.getElementById('ip-send-btn').disabled = true;
-    if (phoneMqtt) phoneMqtt.publish('clifford/'+topic, word);
-    document.getElementById('ip-send-status').textContent = 'sent ✓';
-    setTimeout(() => showStep(2), 900);
-  }
-  document.getElementById('ip-send-btn').addEventListener('click', sendWord);
-  document.getElementById('ip-field').addEventListener('keydown', e => { if(e.key==='Enter') sendWord(); });
-
-  // Step 2: vote choice
-  document.querySelectorAll('.ip-choice').forEach(el => {
-    el.addEventListener('click', () => {
-      document.querySelectorAll('.ip-choice').forEach(c => c.classList.remove('selected'));
-      el.classList.add('selected');
-      selectedVote = el.dataset.val;
-      document.getElementById('ip-vote-btn').disabled = false;
-    });
-  });
-  document.getElementById('ip-vote-btn').addEventListener('click', () => {
-    if (!selectedVote) return;
-    document.getElementById('ip-vote-btn').disabled = true;
-    if (phoneMqtt) phoneMqtt.publish('clifford/'+topic+'/vote', JSON.stringify({voterId, choice:selectedVote}));
-    document.getElementById('ip-vote-status').textContent = 'vote cast ✓';
-    setTimeout(() => showStep(3), 700);
-  });
 
   throw new Error('input-mode');
 })();
