@@ -1,0 +1,1265 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clifford — 3D Universum</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvetica, sans-serif; color: white; }
+
+/* ── Universe labels ──────────────────────────────────────────────────────── */
+#labels { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+.univ-label {
+  position: absolute; transform: translate(-50%, -50%);
+  font-size: 10px; letter-spacing: 0.5em; text-transform: uppercase;
+  pointer-events: none; white-space: nowrap;
+  text-shadow: 0 0 20px currentColor; font-weight: 300;
+}
+
+/* ── Collision name tags ──────────────────────────────────────────────────── */
+.collision-name {
+  position: absolute; transform: translate(-50%, -50%);
+  pointer-events: none; white-space: nowrap;
+  font-weight: 300; font-size: 11px;
+  letter-spacing: 0.48em; text-transform: uppercase;
+  text-shadow: 0 0 6px currentColor, 0 0 18px currentColor;
+}
+
+/* ── Vignette ─────────────────────────────────────────────────────────────── */
+#vignette {
+  position: fixed; inset: 0; pointer-events: none; z-index: 5;
+  background: radial-gradient(ellipse at center, transparent 28%, rgba(0,0,0,0.65) 100%);
+}
+
+/* ── Sequence overlay ─────────────────────────────────────────────────────── */
+#seq-overlay {
+  position: fixed; inset: 0; z-index: 40;
+  background: rgba(0,0,0,0.92);
+  backdrop-filter: blur(3px);
+  display: none;
+  opacity: 0;
+  transition: opacity 0.9s ease;
+  flex-direction: row;
+}
+
+#seq-left {
+  flex: 1;
+  display: flex; align-items: center; justify-content: center;
+  padding: 60px 40px 60px 80px;
+  position: relative;
+}
+
+/* Name display — large, centred in left panel */
+#seq-name {
+  font-weight: 200;
+  letter-spacing: 0.38em;
+  text-transform: uppercase;
+  line-height: 1.1;
+  transition: color 0.8s ease;
+  word-break: break-all;
+  text-align: center;
+}
+#seq-name span {
+  display: inline-block;
+  transition: opacity 0.5s ease, transform 0.5s ease, color 0.8s ease;
+}
+#seq-name.vertical            { writing-mode: vertical-rl; letter-spacing: 0.2em; }
+#seq-name.dissolving span     { opacity: 0; }
+#seq-name.dissolving span:nth-child(odd)  { transform: translateY(-20px) rotate( 8deg); }
+#seq-name.dissolving span:nth-child(even) { transform: translateY( 20px) rotate(-8deg); }
+#seq-name.vertical.dissolving span:nth-child(odd)  { transform: translateX(-20px) rotate( 8deg); }
+#seq-name.vertical.dissolving span:nth-child(even) { transform: translateX( 20px) rotate(-8deg); }
+
+/* Attractor canvas — floats over the name when calc is done */
+#seq-attractor-center {
+  position: absolute; inset: 24px;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0;
+  transition: opacity 0.85s ease;
+  pointer-events: none;
+}
+#attractor-canvas {
+  display: block;
+  max-width: 100%; max-height: 100%;
+  border-radius: 6px;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 0 32px rgba(255,255,255,0.08));
+  animation: attractor-spin 28s linear infinite;
+}
+@keyframes attractor-spin {
+  0%   { transform: perspective(900px) rotateZ(0deg)   rotateX(20deg)  rotateY(5deg); }
+  25%  { transform: perspective(900px) rotateZ(90deg)  rotateX(0deg)   rotateY(-8deg); }
+  50%  { transform: perspective(900px) rotateZ(180deg) rotateX(-20deg) rotateY(5deg); }
+  75%  { transform: perspective(900px) rotateZ(270deg) rotateX(0deg)   rotateY(8deg); }
+  100% { transform: perspective(900px) rotateZ(360deg) rotateX(20deg)  rotateY(5deg); }
+}
+
+/* Right column — calculation panels */
+#seq-right {
+  width: 400px;
+  display: flex; flex-direction: column; justify-content: center;
+  gap: 16px;
+  padding: 40px 44px 40px 20px;
+  border-left: 1px solid rgba(255,255,255,0.07);
+  overflow-y: auto;
+}
+
+/* Calculation panels */
+.calc-panel {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 10px;
+  padding: 18px 20px;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.calc-panel.visible { opacity: 1; }
+
+.calc-title {
+  font-size: 8px;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.35);
+  margin-bottom: 12px;
+  font-family: monospace;
+}
+.calc-body {
+  font-family: monospace;
+  font-size: 11px;
+  line-height: 1.8;
+  color: rgba(255,255,255,0.7);
+  white-space: pre;
+}
+
+/* ── Input UI ─────────────────────────────────────────────────────────────── */
+#ui {
+  position: fixed; top: 32px; left: 36px;
+  z-index: 20; display: flex; flex-direction: column;
+  align-items: flex-start; gap: 10px;
+}
+#input-wrap {
+  background: rgba(255,255,255,0.04); backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,0.08); border-radius: 18px;
+  padding: 8px 8px 8px 22px; display: flex; align-items: center; gap: 8px; width: 300px;
+  transition: border-color 0.3s;
+}
+#input-wrap:focus-within { border-color: rgba(255,255,255,0.2); }
+#name-input {
+  background: transparent; border: none; outline: none; color: white;
+  font-size: 14px; font-weight: 300; letter-spacing: 0.35em; text-transform: uppercase;
+  flex: 1; padding: 8px 0;
+}
+#name-input::placeholder { color: rgba(255,255,255,0.14); font-size: 10px; letter-spacing: 0.18em; }
+#send-btn {
+  width: 38px; height: 38px; border-radius: 11px; background: white; border: none;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: transform 0.15s; flex-shrink: 0;
+}
+#send-btn:hover { transform: scale(1.07); }
+#send-btn svg   { width: 14px; height: 14px; }
+#counter { font-size: 9px; letter-spacing: 0.28em; text-transform: uppercase; color: rgba(255,255,255,0.18); font-family: monospace; }
+
+/* ── Controls hint ────────────────────────────────────────────────────────── */
+#hint {
+  position: fixed; bottom: 28px; right: 36px; z-index: 20;
+  font-size: 8px; letter-spacing: 0.3em; text-transform: uppercase;
+  color: rgba(255,255,255,0.12); font-family: monospace;
+}
+</style>
+</head>
+<body>
+
+<!-- ── Sequence overlay ──────────────────────────────────────────────────── -->
+<div id="seq-overlay">
+  <div id="seq-left">
+    <div id="seq-name"></div>
+    <div id="seq-attractor-center">
+      <canvas id="attractor-canvas" width="700" height="520"></canvas>
+    </div>
+  </div>
+  <div id="seq-right">
+    <div class="calc-panel" id="panel-hex">
+      <div class="calc-title">Chromatische Signatur (djb2)</div>
+      <div class="calc-body" id="hex-body"></div>
+    </div>
+    <div class="calc-panel" id="panel-clifford">
+      <div class="calc-title">Clifford Attraktor — Parameter</div>
+      <div class="calc-body" id="clif-body"></div>
+    </div>
+  </div>
+</div>
+
+<div id="labels"></div>
+<div id="vignette"></div>
+
+<div id="ui">
+  <div id="input-wrap">
+    <input id="name-input" type="text" placeholder="Name eingeben …"
+           maxlength="18" autocomplete="off" spellcheck="false">
+    <button id="send-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2.5"
+           stroke-linecap="round" stroke-linejoin="round">
+        <line x1="22" y1="2" x2="11" y2="13"/>
+        <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+      </svg>
+    </button>
+  </div>
+  <div id="counter"><span id="count">0</span> &nbsp;universes in the room</div>
+</div>
+
+<div id="hint">Shift + Backspace — alles löschen</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+
+// ── Renderer ──────────────────────────────────────────────────────────────────
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.setClearColor(0x000000, 1);
+document.body.insertBefore(renderer.domElement, document.body.firstChild);
+
+const scene  = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(48, innerWidth / innerHeight, 0.1, 500);
+camera.position.set(0, 2, 22);
+camera.lookAt(0, 0, 0);
+
+// ── Stars ─────────────────────────────────────────────────────────────────────
+{
+  const N = 2800, p = new Float32Array(N * 3);
+  for (let i = 0; i < N * 3; i++) p[i] = (Math.random() - 0.5) * 220;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(p, 3));
+  scene.add(new THREE.Points(g, new THREE.PointsMaterial({
+    color: 0xffffff, size: 0.1, sizeAttenuation: true, transparent: true, opacity: 0.38
+  })));
+}
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+const ADDITIVE   = { blending: THREE.AdditiveBlending, depthWrite: false, transparent: true };
+const MAX_PTS    = 70000;
+const CLOUD_RADIUS = 3.0;
+
+// bigBangPhase is always 'idle' in this standalone file
+const bigBangPhase = 'idle';
+
+// ── Color helpers (pure JS — for canvas render) ───────────────────────────────
+function hslToRgb(h, s, l) {
+  // h ∈ [0,1], s ∈ [0,1], l ∈ [0,1]  →  {r,g,b} ∈ [0,1]
+  let r, g, b;
+  if (s === 0) { r = g = b = l; }
+  else {
+    const hue2rgb = (p, q, t) => {
+      if (t < 0) t += 1; if (t > 1) t -= 1;
+      if (t < 1/6) return p + (q-p)*6*t;
+      if (t < 1/2) return q;
+      if (t < 2/3) return p + (q-p)*(2/3-t)*6;
+      return p;
+    };
+    const q = l < 0.5 ? l*(1+s) : l+s-l*s;
+    const p = 2*l - q;
+    r = hue2rgb(p, q, h + 1/3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1/3);
+  }
+  return { r, g, b };
+}
+
+// ── Math helpers ──────────────────────────────────────────────────────────────
+function djb2(str) {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) & 0xFFFFFFFF;
+  return Math.abs(h);
+}
+
+function seededRNG(seed) {
+  let s = seed >>> 0;
+  return () => { s = (Math.imul(s, 1664525) + 1013904223) | 0; return (s >>> 0) / 4294967296; };
+}
+
+function isDegenerate(a, b, c, d) {
+  let x = 0.1, y = 0.1;
+  for (let i = 0; i < 300; i++) {
+    const nx = Math.sin(a*y)+c*Math.cos(a*x), ny = Math.sin(b*x)+d*Math.cos(b*y);
+    if (!isFinite(nx)||!isFinite(ny)) return true;
+    x=nx; y=ny;
+  }
+  let minX=x,maxX=x,minY=y,maxY=y,sx=x,sy=y;
+  for (let i = 0; i < 400; i++) {
+    const nx=Math.sin(a*sy)+c*Math.cos(a*sx), ny=Math.sin(b*sx)+d*Math.cos(b*sy);
+    if(!isFinite(nx)||!isFinite(ny)) return true;
+    sx=nx; sy=ny;
+    if(sx<minX)minX=sx; if(sx>maxX)maxX=sx;
+    if(sy<minY)minY=sy; if(sy>maxY)maxY=sy;
+  }
+  if((maxX-minX)*(maxY-minY)<0.5) return true;
+  const GRID=30, rX=maxX-minX||1, rY=maxY-minY||1, visited=new Set();
+  for (let i = 0; i < 800; i++) {
+    const nx=Math.sin(a*y)+c*Math.cos(a*x), ny=Math.sin(b*x)+d*Math.cos(b*y);
+    if(!isFinite(nx)||!isFinite(ny)) return true;
+    x=nx; y=ny;
+    visited.add((Math.floor((x-minX)/rX*GRID)|0)*100+(Math.floor((y-minY)/rY*GRID)|0));
+  }
+  return visited.size < 40;
+}
+
+// ── Name → color signature ────────────────────────────────────────────────────
+function nameSignature(name) {
+  const clean = name.toUpperCase().replace(/[^A-Z]/g, '');
+  const hash  = djb2(clean);
+  const hue   = hash % 360;
+  const sat   = 72 + (Math.abs(hash >> 8))  % 22;
+  const light = 54 + (Math.abs(hash >> 16)) % 20;
+  const color = new THREE.Color().setHSL(hue/360, sat/100, light/100);
+  // hN, sN, lN: normalised [0,1] for canvas render (no Three.js dependency)
+  return { hash, hue, sat, light,
+           hex: '#' + color.getHexString().toUpperCase(),
+           color, clean,
+           hN: hue/360, sN: sat/100, lN: light/100 };
+}
+
+// ── Name → Clifford parameters ────────────────────────────────────────────────
+function cliffordParams(name) {
+  const clean = name.toUpperCase().replace(/[^A-Z]/g, '');
+  if (!clean.length) return { a:-1.4, b:1.6, c:1.0, d:0.7 };
+  const baseHash = djb2(clean);
+  for (let attempt = 0; attempt < 60; attempt++) {
+    const rng = seededRNG(baseHash + attempt * 7919);
+    const r0=rng(),r1=rng(),r2=rng(),r3=rng();
+    const s0=rng()<0.5?1:-1, s1=rng()<0.5?1:-1, s2=rng()<0.5?1:-1, s3=rng()<0.5?1:-1;
+    const a=s0*(1.0+r0*1.5), b=s1*(1.0+r1*1.5), c=s2*(0.3+r2*1.5), d=s3*(0.3+r3*1.5);
+    if (!isDegenerate(a,b,c,d)) return { a,b,c,d };
+  }
+  return { a:-1.4, b:1.6, c:1.0, d:0.7 };
+}
+
+// ── 3D point cloud from Clifford attractor ────────────────────────────────────
+function generateClifford3D(params, n) {
+  const {a,b,c,d} = params;
+  let x=0.1,y=0.1;
+  for (let i=0;i<500;i++){
+    const nx=Math.sin(a*y)+c*Math.cos(a*x), ny=Math.sin(b*x)+d*Math.cos(b*y);
+    x=isFinite(nx)?nx:0.1; y=isFinite(ny)?ny:0.1;
+  }
+  let minX=x,maxX=x,minY=y,maxY=y,sx=x,sy=y;
+  for (let i=0;i<6000;i++){
+    const nx=Math.sin(a*sy)+c*Math.cos(a*sx), ny=Math.sin(b*sx)+d*Math.cos(b*sy);
+    sx=isFinite(nx)?nx:0.1; sy=isFinite(ny)?ny:0.1;
+    if(sx<minX)minX=sx; if(sx>maxX)maxX=sx;
+    if(sy<minY)minY=sy; if(sy>maxY)maxY=sy;
+  }
+  const cx=(minX+maxX)/2, cy=(minY+maxY)/2;
+  const span=Math.max(maxX-minX,maxY-minY)||1;
+  const scale=(CLOUD_RADIUS*2)/span;
+  const pts=new Float32Array(n*3);
+  for (let i=0;i<n;i++){
+    const nx=Math.sin(a*y)+c*Math.cos(a*x), ny=Math.sin(b*x)+d*Math.cos(b*y);
+    x=isFinite(nx)?nx:0.1; y=isFinite(ny)?ny:0.1;
+    pts[i*3]=(x-cx)*scale; pts[i*3+1]=(y-cy)*scale; pts[i*3+2]=Math.sin(x*y)*0.35;
+  }
+  return pts;
+}
+
+// ── 2D log-density canvas render (Paul Bourke style) ─────────────────────────
+function renderAttractorCanvas(canvas, params, sig) {
+  const CW = canvas.width, CH = canvas.height;
+  const ctx = canvas.getContext('2d');
+  const { a, b, c, d } = params;
+  const N = 2_000_000;
+
+  let x=0.1, y=0.1;
+  for (let i=0; i<500; i++) {
+    const nx=Math.sin(a*y)+c*Math.cos(a*x);
+    const ny=Math.sin(b*x)+d*Math.cos(b*y);
+    x=isFinite(nx)?nx:0.1; y=isFinite(ny)?ny:0.1;
+  }
+
+  let minX=x,maxX=x,minY=y,maxY=y, tx=x,ty=y;
+  for (let i=0; i<18000; i++) {
+    const nx=Math.sin(a*ty)+c*Math.cos(a*tx);
+    const ny=Math.sin(b*tx)+d*Math.cos(b*ty);
+    tx=isFinite(nx)?nx:0.1; ty=isFinite(ny)?ny:0.1;
+    if(tx<minX)minX=tx; if(tx>maxX)maxX=tx;
+    if(ty<minY)minY=ty; if(ty>maxY)maxY=ty;
+  }
+
+  const attrW=(maxX-minX)||1, attrH=(maxY-minY)||1;
+  const canvasAspect=CW/CH, attrAspect=attrW/attrH;
+  let sX, sY, bX, bY;
+  if (attrAspect > canvasAspect) { sX=attrW*1.12; sY=sX/canvasAspect; }
+  else                            { sY=attrH*1.12; sX=sY*canvasAspect; }
+  bX=(minX+maxX)/2-sX/2; bY=(minY+maxY)/2-sY/2;
+
+  const counts = new Int32Array(CW*CH);
+  x=0.1; y=0.1;
+  for (let i=0; i<N; i++) {
+    const nx=Math.sin(a*y)+c*Math.cos(a*x);
+    const ny=Math.sin(b*x)+d*Math.cos(b*y);
+    x=isFinite(nx)?nx:0.1; y=isFinite(ny)?ny:0.1;
+    const px=(x-bX)/sX*CW|0;
+    const py=CH-1-((y-bY)/sY*CH|0);
+    if(px>=0&&px<CW&&py>=0&&py<CH) counts[py*CW+px]++;
+  }
+  let maxC=0;
+  for (let i=0; i<CW*CH; i++) if(counts[i]>maxC) maxC=counts[i];
+  const logMax=Math.log(maxC+1);
+
+  // Color ramp — pure JS, uses sig.hN / sN / lN
+  const bH=sig.hN, bS=sig.sN, bL=sig.lN;
+  ctx.clearRect(0, 0, CW, CH);
+  const img=ctx.createImageData(CW,CH);
+
+  for (let i=0; i<CW*CH; i++) {
+    if (counts[i]===0) continue;
+    let t = Math.log(counts[i]+1) / logMax;
+    t = Math.pow(t, 0.38);
+
+    let lOut, sOut;
+    if (t < 0.25) {
+      lOut = (t/0.25)*bL*0.16; sOut = bS*0.30;
+    } else if (t < 0.65) {
+      const tt=(t-0.25)/0.40; lOut=bL*0.16+tt*bL*0.52; sOut=bS*0.98;
+    } else {
+      const tt=(t-0.65)/0.35; lOut=bL*0.68+tt*(1.0-bL*0.68); sOut=bS*(1-tt*0.98);
+    }
+    lOut = Math.min(lOut, 1);
+    const { r, g, b: bl } = hslToRgb(bH, sOut, lOut);
+    img.data[i*4]   = r*255|0;
+    img.data[i*4+1] = g*255|0;
+    img.data[i*4+2] = bl*255|0;
+    img.data[i*4+3] = Math.round(Math.pow(t, 0.38)*240);
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+// ── Sequence helpers ──────────────────────────────────────────────────────────
+const delay = ms => new Promise(r => setTimeout(r, ms));
+
+function fmt(n, dec=2) {
+  return Math.abs(n)>=1000 ? n.toFixed(0) : n.toFixed(dec);
+}
+
+async function typeIn(el, lines, msPerChar=18) {
+  const full = lines.join('\n');
+  el.textContent = '';
+  for (let i=0; i<full.length; i++) {
+    el.textContent = full.slice(0, i+1);
+    await delay(full[i]==='\n' ? 60 : msPerChar);
+  }
+}
+
+// ── runSequence — name → hex panel → clifford panel → attractor preview ───────
+// Called from spawnName AFTER the wave is already created and orbiting.
+// busy flag is managed by spawnName.
+
+async function runSequence(name, sig, params) {
+  const overlay    = document.getElementById('seq-overlay');
+  const nameEl     = document.getElementById('seq-name');
+  const hexP       = document.getElementById('panel-hex');
+  const clifP      = document.getElementById('panel-clifford');
+  const hexBody    = document.getElementById('hex-body');
+  const clifBody   = document.getElementById('clif-body');
+  const aCanvas    = document.getElementById('attractor-canvas');
+  const attrCenter = document.getElementById('seq-attractor-center');
+
+  // ── Reset ──────────────────────────────────────────────────────────────────
+  hexBody.textContent = ''; clifBody.textContent = '';
+  hexP.classList.remove('visible'); clifP.classList.remove('visible');
+  attrCenter.style.opacity = '0';
+  nameEl.style.opacity = '1'; nameEl.style.transition = '';
+  nameEl.style.color = 'white';
+  nameEl.classList.remove('dissolving', 'vertical');
+
+  overlay.style.display = 'flex';
+  overlay.style.opacity = '0';
+
+  // ── Name display (left panel) ──────────────────────────────────────────────
+  const clean = [...name.toUpperCase()].filter(l => /[A-Z]/.test(l));
+  nameEl.innerHTML = clean.map(l => `<span>${l}</span>`).join(' ');
+
+  const n = clean.length;
+  const vertical = n > 12;
+  nameEl.classList.toggle('vertical', vertical);
+  let fs;
+  if (vertical) {
+    fs = Math.max(28, Math.min(78, Math.floor(300 / n)));
+  } else {
+    fs = Math.max(30, Math.min(90, Math.floor(640 / (n * 1.42))));
+  }
+  nameEl.style.fontSize      = fs + 'px';
+  nameEl.style.letterSpacing = n > 8 ? '0.28em' : '0.4em';
+
+  await delay(50);
+  overlay.style.opacity = '1';
+  await delay(700);
+
+  // ── Panel 1: Chromatische Signatur (djb2) ──────────────────────────────────
+  hexP.classList.add('visible');
+  const letters = [...sig.clean];
+  const hexLines = [];
+  let h = 5381;
+  const showCount = Math.min(letters.length, 6);
+  for (let i = 0; i < showCount; i++) {
+    const cc  = letters[i].charCodeAt(0);
+    const hexChar = '0x' + cc.toString(16).padStart(2, '0');
+    h = ((h << 5) + h + cc) & 0xFFFFFFFF;
+    const hexH = '0x' + Math.abs(h).toString(16).padStart(8, '0');
+    hexLines.push(`${letters[i]}  →  ${hexChar}  ·  h = ${hexH}`);
+  }
+  if (letters.length > showCount)
+    hexLines.push(`[+ ${letters.length - showCount} weitere …]`);
+
+  await typeIn(hexBody, hexLines, 16);
+
+  // Result block: big hex, HSL line, name in color
+  await delay(120);
+  const sep = document.createElement('div');
+  sep.style.cssText = 'margin-top:14px;border-top:1px solid rgba(255,255,255,0.07);padding-top:12px;';
+
+  const hexDisp = document.createElement('div');
+  hexDisp.textContent = sig.hex;
+  hexDisp.style.cssText = `font-size:20px;font-weight:600;letter-spacing:0.12em;
+    color:${sig.hex};font-family:monospace;margin-bottom:5px;`;
+
+  const hslDisp = document.createElement('div');
+  hslDisp.textContent = `hue ${sig.hue}°  ·  sat ${sig.sat}%  ·  light ${sig.light}%`;
+  hslDisp.style.cssText = `font-size:9px;letter-spacing:0.1em;color:rgba(255,255,255,0.38);
+    font-family:monospace;margin-bottom:10px;`;
+
+  const nameDisp = document.createElement('div');
+  nameDisp.textContent = sig.clean;
+  nameDisp.style.cssText = `font-size:15px;font-weight:300;letter-spacing:0.5em;
+    color:${sig.hex};font-family:'Helvetica Neue',Helvetica,sans-serif;`;
+
+  sep.appendChild(hexDisp);
+  sep.appendChild(hslDisp);
+  sep.appendChild(nameDisp);
+  hexBody.appendChild(sep);
+
+  // Name adopts its color
+  await delay(200);
+  nameEl.style.color = sig.hex;
+  nameEl.querySelectorAll('span').forEach(s => s.style.color = sig.hex);
+  await delay(400);
+
+  // ── Panel 2: Clifford Parameter ────────────────────────────────────────────
+  clifP.classList.add('visible');
+  const { a, b, c, d } = params;
+  const sign = v => v >= 0 ? '+' : '−';
+  const clifLines = [
+    `x' = sin(a·y) + c·cos(a·x)`,
+    `y' = sin(b·x) + d·cos(b·y)`,
+    ``,
+    `${sig.clean} →`,
+    `  a = ${sign(a)}${fmt(Math.abs(a))}`,
+    `  b = ${sign(b)}${fmt(Math.abs(b))}`,
+    `  c = ${sign(c)}${fmt(Math.abs(c))}`,
+    `  d = ${sign(d)}${fmt(Math.abs(d))}`,
+    ``,
+    `n = 70,000 iterations`,
+  ];
+  await typeIn(clifBody, clifLines, 15);
+
+  // ── Attractor preview (2D log-density render) ──────────────────────────────
+  await delay(80);
+  renderAttractorCanvas(aCanvas, params, sig);
+
+  nameEl.style.transition = 'opacity 0.65s ease';
+  nameEl.style.opacity    = '0.08';
+  attrCenter.style.opacity = '1';
+
+  await delay(1400);
+
+  // Dissolve name letters
+  nameEl.classList.add('dissolving');
+  nameEl.querySelectorAll('span').forEach((s, i) => {
+    s.style.transitionDelay = `${i * 55}ms`;
+  });
+
+  await delay(1100);
+
+  // Fade overlay out
+  overlay.style.opacity = '0';
+  await delay(900);
+
+  overlay.style.display    = 'none';
+  attrCenter.style.opacity = '0';
+  nameEl.classList.remove('dissolving', 'vertical');
+  nameEl.style.transition  = '';
+  nameEl.style.opacity     = '1';
+}
+
+// ── NameWave — orbiting Clifford point cloud ──────────────────────────────────
+class NameWave {
+  constructor(name, id, prePositioned = false) {
+    this.name    = name.toUpperCase();
+    this.id      = id;
+    this.letters = [...this.name].filter(l => /[A-Z]/.test(l)).slice(0, 16);
+    this.sig     = nameSignature(name);
+    this.params  = cliffordParams(name);
+    this.age     = 0;
+    this.dead    = false;
+    this.touchCooldown = 0;
+
+    // ── Orbital parameters ───────────────────────────────────────────────────
+    const orbA = 4.5 + Math.random() * 5.0;
+    const orbB = orbA * (0.55 + Math.random() * 0.40);
+    this._orbA     = orbA;
+    this._orbB     = orbB;
+    this._orbSpeed = (0.022 + Math.random() * 0.038) * (Math.random() < 0.4 ? -1 : 1);
+    this._orbPhase = Math.random() * Math.PI * 2;
+    const Omega = Math.random() * Math.PI * 2;
+    const incl  = (Math.random() - 0.5) * 1.4;
+    this._orbU = new THREE.Vector3(Math.cos(Omega), 0, Math.sin(Omega));
+    this._orbV = new THREE.Vector3(
+      -Math.sin(Omega) * Math.cos(incl),
+       Math.sin(incl),
+       Math.cos(Omega) * Math.cos(incl)
+    );
+    this._orbOffset = new THREE.Vector3();
+
+    // Starting world position
+    const _th0 = this._orbPhase;
+    const _ox0 = orbA * Math.cos(_th0), _oy0 = orbB * Math.sin(_th0);
+    const _orbStart = new THREE.Vector3(
+      _ox0 * this._orbU.x + _oy0 * this._orbV.x,
+      _ox0 * this._orbU.y + _oy0 * this._orbV.y,
+      _ox0 * this._orbU.z + _oy0 * this._orbV.z
+    );
+
+    if (prePositioned) {
+      this.center = _orbStart.clone();
+    } else {
+      this.center = new THREE.Vector3(0, 0, 0);
+      this._target = _orbStart.clone();
+      this.vel = this._target.clone().normalize().multiplyScalar(0.5);
+    }
+    this._launched = prePositioned;
+
+    // ── Personality ──────────────────────────────────────────────────────────
+    this._spinZ = (Math.random() - 0.5) * 0.09;
+    this._spinY = (Math.random() - 0.5) * 0.05;
+    this._spinX = (Math.random() - 0.5) * 0.02;
+
+    // ── Breath rhythm ─────────────────────────────────────────────────────────
+    this._breathPhase  = Math.random() * Math.PI * 2;
+    this._breathPeriod = 18 + Math.random() * 28;
+
+    // ── Clifford morphing ─────────────────────────────────────────────────────
+    this._morphClock    = Math.random() * 7;
+    this._morphInterval = 4 + Math.random() * 6;
+
+    // ── Keplerian orbit ───────────────────────────────────────────────────────
+    this._orbTheta = this._orbPhase;
+    this._orbEcc   = Math.sqrt(Math.max(0, 1 - (orbB / orbA) ** 2));
+
+    // ── Tidal lean ────────────────────────────────────────────────────────────
+    this._tidalLean = new THREE.Vector3();
+
+    // ── Color absorption ──────────────────────────────────────────────────────
+    this._colorTarget        = null;
+    this._colorShiftProgress = 0;
+    this._colorShiftDuration = 4.0;
+
+    // ── Energy exchange ───────────────────────────────────────────────────────
+    this.isReadyToExchange = true;
+    this._exchangeCooldown = 0;
+
+    // ── Geometry ──────────────────────────────────────────────────────────────
+    const pts3d = generateClifford3D(this.params, MAX_PTS);
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pts3d.slice(), 3));
+    geo.setDrawRange(0, prePositioned ? MAX_PTS : 0);
+    this.mat = new THREE.PointsMaterial({
+      color: this.sig.color, size: 0.018, sizeAttenuation: true,
+      opacity: prePositioned ? 0.65 : 0, ...ADDITIVE
+    });
+    this.cloud = new THREE.Points(geo, this.mat);
+
+    const geo2 = new THREE.BufferGeometry();
+    geo2.setAttribute('position', new THREE.BufferAttribute(pts3d, 3));
+    geo2.setDrawRange(0, prePositioned ? MAX_PTS : 0);
+    this.mat2 = new THREE.PointsMaterial({
+      color: this.sig.color, size: 0.058, sizeAttenuation: true,
+      opacity: prePositioned ? 0.16 : 0, ...ADDITIVE
+    });
+    this.cloud2 = new THREE.Points(geo2, this.mat2);
+
+    this.group = new THREE.Group();
+    this.group.add(this.cloud, this.cloud2);
+    this.group.position.copy(this.center);
+    scene.add(this.group);
+
+    // ── Orbital ring ──────────────────────────────────────────────────────────
+    const SEG = 128, orbPts = [];
+    for (let i = 0; i <= SEG; i++) {
+      const th = (i / SEG) * Math.PI * 2;
+      const ox = this._orbA * Math.cos(th), oy = this._orbB * Math.sin(th);
+      orbPts.push(new THREE.Vector3(
+        ox * this._orbU.x + oy * this._orbV.x,
+        ox * this._orbU.y + oy * this._orbV.y,
+        ox * this._orbU.z + oy * this._orbV.z
+      ));
+    }
+    const orbGeo = new THREE.BufferGeometry().setFromPoints(orbPts);
+    this.orbMat = new THREE.LineBasicMaterial({
+      color: this.sig.color, opacity: prePositioned ? 0.13 : 0,
+      transparent: true, depthWrite: false
+    });
+    this.orbLine = new THREE.Line(orbGeo, this.orbMat);
+    scene.add(this.orbLine);
+
+    this._drawCount  = prePositioned ? MAX_PTS : 0;
+    this._fullyDrawn = prePositioned;
+  }
+
+  update(dt) {
+    this.age += dt;
+    this.touchCooldown = Math.max(0, this.touchCooldown - dt);
+
+    // ── Exchange cooldown ────────────────────────────────────────────────────
+    if (!this.isReadyToExchange) {
+      this._exchangeCooldown -= dt;
+      if (this._exchangeCooldown <= 0) this.isReadyToExchange = true;
+    }
+
+    // ── Color absorption ─────────────────────────────────────────────────────
+    if (this._colorTarget !== null) {
+      this._colorShiftProgress = Math.min(1, this._colorShiftProgress + dt / this._colorShiftDuration);
+      const stepAmt = (0.03 / this._colorShiftDuration) * dt;
+      this.sig.color.lerp(this._colorTarget, stepAmt);
+      this.sig.hex = '#' + this.sig.color.getHexString().toUpperCase();
+      this.mat.color.copy(this.sig.color);
+      this.mat2.color.copy(this.sig.color);
+      if (this._colorShiftProgress >= 1) this._colorTarget = null;
+    }
+
+    // ── Progressive draw reveal (for newly added waves) ──────────────────────
+    if (!this._fullyDrawn) {
+      this._drawCount = Math.min(this._drawCount + 4000, MAX_PTS);
+      this.cloud.geometry.setDrawRange(0, this._drawCount);
+      this.cloud2.geometry.setDrawRange(0, this._drawCount);
+      if (this._drawCount >= MAX_PTS) this._fullyDrawn = true;
+      const frac = this._drawCount / MAX_PTS;
+      this.mat.opacity    = Math.min(0.65, frac * 0.65);
+      this.mat2.opacity   = Math.min(0.16, frac * 0.16);
+      this.orbMat.opacity = Math.min(0.13, frac * 0.13);
+    }
+
+    // ── Position update ───────────────────────────────────────────────────────
+    if (!this._launched) {
+      this.center.addScaledVector(this.vel, dt);
+      if (this._target && this.center.distanceTo(this._target) < 0.6) {
+        this._launched = true;
+        this.vel = undefined;
+      }
+    } else {
+      // Keplerian orbit
+      this._orbTheta += this._orbSpeed * (1 + this._orbEcc * 0.75 * Math.cos(this._orbTheta)) * dt;
+      const ox = this._orbA * Math.cos(this._orbTheta);
+      const oy = this._orbB * Math.sin(this._orbTheta);
+      this.center.set(
+        ox * this._orbU.x + oy * this._orbV.x + this._orbOffset.x,
+        ox * this._orbU.y + oy * this._orbV.y + this._orbOffset.y,
+        ox * this._orbU.z + oy * this._orbV.z + this._orbOffset.z
+      );
+      this._orbOffset.multiplyScalar(Math.pow(0.92, dt * 60));
+      if (this.orbLine) this.orbLine.visible = true;
+    }
+
+    // ── Group transform ───────────────────────────────────────────────────────
+    this.group.position.copy(this.center);
+    this.group.rotation.z += dt * this._spinZ;
+    this.group.rotation.y += dt * this._spinY;
+    this.group.rotation.x += dt * this._spinX;
+
+    if (this._launched) {
+      // Tidal lean
+      let nearDist = Infinity, nearWave = null;
+      nameWaves.forEach(w => {
+        if (w === this || !w._launched) return;
+        const d = this.center.distanceTo(w.center);
+        if (d < nearDist) { nearDist = d; nearWave = w; }
+      });
+      if (nearWave && nearDist < 11) {
+        const str = Math.pow(Math.max(0, 1 - nearDist / 11), 2) * 0.28;
+        const dir = nearWave.center.clone().sub(this.center).normalize();
+        this._tidalLean.lerp(dir.multiplyScalar(str), Math.min(1, dt * 1.8));
+      } else {
+        this._tidalLean.multiplyScalar(Math.max(0, 1 - dt * 2.5));
+      }
+      this.group.position.add(this._tidalLean);
+
+      // Breath scale
+      const breathAmt = Math.sin(this.age * (Math.PI * 2 / this._breathPeriod) + this._breathPhase);
+      this.group.scale.setScalar(1 + 0.055 * breathAmt);
+
+      // Clifford morphing
+      this._morphClock += dt;
+      if (this._morphClock >= this._morphInterval) {
+        this._morphClock = 0;
+        const d = 0.005;
+        const np = {
+          a: this.params.a + (Math.random() - 0.5) * d,
+          b: this.params.b + (Math.random() - 0.5) * d,
+          c: this.params.c + (Math.random() - 0.5) * d * 0.65,
+          d: this.params.d + (Math.random() - 0.5) * d * 0.65,
+        };
+        if (!isDegenerate(np.a, np.b, np.c, np.d)) {
+          this.params.a = np.a; this.params.b = np.b;
+          this.params.c = np.c; this.params.d = np.d;
+          const newPts = generateClifford3D(this.params, MAX_PTS);
+          this.cloud.geometry.attributes.position.array.set(newPts.slice());
+          this.cloud.geometry.attributes.position.needsUpdate = true;
+          this.cloud2.geometry.attributes.position.array.set(newPts);
+          this.cloud2.geometry.attributes.position.needsUpdate = true;
+        }
+      }
+    }
+
+    // ── Age fade (after 5 min) ────────────────────────────────────────────────
+    if (this.age > 300) {
+      const a = Math.max(0, 1 - (this.age - 300) / 60);
+      this.mat.opacity = 0.65 * a; this.mat2.opacity = 0.16 * a; this.orbMat.opacity = 0.13 * a;
+      if (a <= 0) this.dead = true;
+    }
+  }
+
+  // ── Energy exchange ───────────────────────────────────────────────────────
+  applyExchange(partner) {
+    this._colorTarget        = partner.sig.color.clone();
+    this._colorShiftProgress = 0;
+    const keys = ['a','b','c','d'];
+    const key  = keys[Math.floor(Math.random() * 4)];
+    this.params[key] += (Math.random() < 0.5 ? 1 : -1) * 0.001;
+    const newPts = generateClifford3D(this.params, MAX_PTS);
+    this.cloud.geometry.attributes.position.array.set(newPts.slice());
+    this.cloud.geometry.attributes.position.needsUpdate = true;
+    this.cloud2.geometry.attributes.position.array.set(newPts);
+    this.cloud2.geometry.attributes.position.needsUpdate = true;
+    this.isReadyToExchange = false;
+    this._exchangeCooldown = 45;
+  }
+
+  uniqueLetters()    { return [...new Set(this.letters)]; }
+  sharedLetters(other) { const s = new Set(this.uniqueLetters()); return other.uniqueLetters().filter(l => s.has(l)); }
+  canTouch()    { return this.touchCooldown <= 0 && this._launched && this._fullyDrawn; }
+  markTouched() { this.touchCooldown = 4; }
+
+  flash() {
+    const o1 = this.mat.opacity, o2 = this.mat2.opacity;
+    this.mat.opacity = 1.0; this.mat2.opacity = 0.5;
+    setTimeout(() => { this.mat.opacity = o1; this.mat2.opacity = o2; }, 420);
+  }
+
+  destroy() {
+    scene.remove(this.group);
+    scene.remove(this.orbLine);
+  }
+}
+
+// ── Particle flow (energy exchange arc) ───────────────────────────────────────
+class ParticleFlow {
+  constructor(centerA, centerB, colorA, colorB) {
+    this.from = centerA.clone(); this.to = centerB.clone();
+    this.age = 0; this.maxAge = 3.2; this.dead = false;
+    const mid = centerA.clone().add(centerB).multiplyScalar(0.5);
+    mid.x += -(centerB.z - centerA.z) * 0.22;
+    mid.y += 1.8;
+    mid.z +=  (centerB.x - centerA.x) * 0.22;
+    this.ctrl = mid;
+    const N = 70; this.N = N;
+    this.offsets = new Float32Array(N);
+    for (let i = 0; i < N; i++) this.offsets[i] = i / N;
+    const pos = new Float32Array(N * 3);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    this.posAttr = geo.attributes.position;
+    this.mat = new THREE.PointsMaterial({
+      color: colorA.clone(), size: 0.14, sizeAttenuation: true,
+      opacity: 0, ...ADDITIVE
+    });
+    this.points = new THREE.Points(geo, this.mat);
+    scene.add(this.points);
+  }
+  bezier(t) {
+    const u = 1 - t;
+    return new THREE.Vector3(
+      u*u*this.from.x + 2*u*t*this.ctrl.x + t*t*this.to.x,
+      u*u*this.from.y + 2*u*t*this.ctrl.y + t*t*this.to.y,
+      u*u*this.from.z + 2*u*t*this.ctrl.z + t*t*this.to.z
+    );
+  }
+  update(dt) {
+    this.age += dt;
+    if (this.age >= this.maxAge) { scene.remove(this.points); this.dead = true; return false; }
+    const p = this.age / this.maxAge;
+    for (let i = 0; i < this.N; i++) {
+      const b = this.bezier((this.offsets[i] + p) % 1.0);
+      this.posAttr.array[i*3] = b.x; this.posAttr.array[i*3+1] = b.y; this.posAttr.array[i*3+2] = b.z;
+    }
+    this.posAttr.needsUpdate = true;
+    this.mat.opacity = p < 0.15 ? (p/0.15)*0.92 : p < 0.70 ? 0.92 : 0.92*(1-(p-0.70)/0.30);
+    return true;
+  }
+  destroy() { scene.remove(this.points); }
+}
+
+// ── Touch arc ─────────────────────────────────────────────────────────────────
+class TouchArc {
+  constructor(from, to, color) {
+    const pts = [];
+    for (let i = 0; i <= 40; i++) {
+      const t = i / 40;
+      pts.push(new THREE.Vector3(
+        from.x + (to.x - from.x) * t,
+        from.y + (to.y - from.y) * t + Math.sin(t * Math.PI) * 2.5,
+        from.z + (to.z - from.z) * t
+      ));
+    }
+    const g = new THREE.BufferGeometry().setFromPoints(pts);
+    this.mat = new THREE.LineBasicMaterial({ color, opacity: 0.95, ...ADDITIVE });
+    this.line = new THREE.Line(g, this.mat);
+    this.age = 0; this.maxAge = 2.2;
+    scene.add(this.line);
+  }
+  update(dt) { this.age += dt; this.mat.opacity = Math.max(0, 0.95 * (1 - this.age / this.maxAge)); return this.age < this.maxAge; }
+  destroy() { scene.remove(this.line); }
+}
+
+// ── Clash burst ───────────────────────────────────────────────────────────────
+class ClashBurst {
+  constructor(pos, colorA, colorB) {
+    this.age = 0; this.maxAge = 0.9;
+    const N = 80, arr = new Float32Array(N * 3);
+    this.vels = new Float32Array(N * 3);
+    for (let i = 0; i < N; i++) {
+      arr[i*3]   = pos.x + (Math.random()-0.5)*0.08;
+      arr[i*3+1] = pos.y + (Math.random()-0.5)*0.08;
+      arr[i*3+2] = pos.z + (Math.random()-0.5)*0.08;
+      const phi = Math.acos(2*Math.random()-1), theta = Math.random()*Math.PI*2;
+      const spd = 0.6 + Math.random()*4.5;
+      this.vels[i*3]=Math.sin(phi)*Math.cos(theta)*spd;
+      this.vels[i*3+1]=Math.sin(phi)*Math.sin(theta)*spd;
+      this.vels[i*3+2]=Math.cos(phi)*spd;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+    this.posAttr = geo.attributes.position;
+    this.mat = new THREE.PointsMaterial({
+      color: colorA.clone().lerp(colorB, 0.5), size: 0.13, sizeAttenuation: true,
+      opacity: 0, ...ADDITIVE
+    });
+    this.points = new THREE.Points(geo, this.mat);
+    scene.add(this.points);
+  }
+  update(dt) {
+    this.age += dt;
+    if (this.age >= this.maxAge) { scene.remove(this.points); return false; }
+    const p = this.age / this.maxAge;
+    const arr = this.posAttr.array;
+    for (let i = 0; i < arr.length/3; i++) {
+      arr[i*3]   += this.vels[i*3]   * dt;
+      arr[i*3+1] += this.vels[i*3+1] * dt;
+      arr[i*3+2] += this.vels[i*3+2] * dt;
+      this.vels[i*3]  *=0.91; this.vels[i*3+1]*=0.91; this.vels[i*3+2]*=0.91;
+    }
+    this.posAttr.needsUpdate = true;
+    this.mat.opacity = p < 0.12 ? p/0.12 : Math.pow(1-(p-0.12)/0.88, 1.4);
+    return true;
+  }
+  destroy() { scene.remove(this.points); }
+}
+
+// ── Collision labels ──────────────────────────────────────────────────────────
+function _clearestAngle(sx, sy, steps = 12) {
+  const PROBE = 200;
+  let bestAngle = 0, bestScore = -1;
+  const wsp = nameWaves.map(w => {
+    const v = w.center.clone().project(camera);
+    return { x: (v.x+1)/2*innerWidth, y: (-v.y+1)/2*innerHeight };
+  });
+  for (let k = 0; k < steps; k++) {
+    const angle = (k / steps) * Math.PI * 2;
+    const tx = sx + Math.cos(angle)*PROBE, ty = sy + Math.sin(angle)*PROBE;
+    let minDist = Infinity;
+    for (const p of wsp) minDist = Math.min(minDist, Math.hypot(tx-p.x, ty-p.y));
+    const margin = 60;
+    if (tx<margin||tx>innerWidth-margin||ty<margin||ty>innerHeight-margin) minDist *= 0.3;
+    if (minDist > bestScore) { bestScore = minDist; bestAngle = angle; }
+  }
+  return bestAngle;
+}
+
+class CollisionLabel {
+  constructor(centerA, centerB, nameA, hexA, nameB, hexB) {
+    this.centerA = centerA.clone(); this.centerB = centerB.clone();
+    this.age = 0; this.maxAge = 2.8; this.dead = false;
+    const vA = centerA.clone().project(camera), vB = centerB.clone().project(camera);
+    const sxA=(vA.x+1)/2*innerWidth, syA=(-vA.y+1)/2*innerHeight;
+    const sxB=(vB.x+1)/2*innerWidth, syB=(-vB.y+1)/2*innerHeight;
+    this._angA = _clearestAngle(sxA, syA);
+    this._angB = _clearestAngle(sxB, syB);
+    this.elA = document.createElement('div'); this.elA.className='collision-name';
+    this.elA.textContent=nameA; this.elA.style.color=hexA;
+    this.elB = document.createElement('div'); this.elB.className='collision-name';
+    this.elB.textContent=nameB; this.elB.style.color=hexB;
+    const labelsEl = document.getElementById('labels');
+    labelsEl.appendChild(this.elA); labelsEl.appendChild(this.elB);
+    this.svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+    this.svg.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:9;width:100%;height:100%;overflow:visible;';
+    this.lnA = document.createElementNS('http://www.w3.org/2000/svg','line');
+    this.lnB = document.createElementNS('http://www.w3.org/2000/svg','line');
+    [this.lnA,this.lnB].forEach(l=>{l.setAttribute('stroke-width','0.6');l.setAttribute('stroke-dasharray','3 4');});
+    this.lnA.setAttribute('stroke',hexA); this.lnB.setAttribute('stroke',hexB);
+    this.svg.appendChild(this.lnA); this.svg.appendChild(this.lnB);
+    document.body.appendChild(this.svg);
+  }
+  update(dt) {
+    this.age += dt;
+    if (this.age >= this.maxAge) { this.destroy(); this.dead = true; return false; }
+    const p = this.age / this.maxAge;
+    const opacity = p<0.08?p/0.08:p<0.75?1:1-(p-0.75)/0.25;
+    const vA=this.centerA.clone().project(camera), vB=this.centerB.clone().project(camera);
+    const sxA=(vA.x+1)/2*innerWidth, syA=(-vA.y+1)/2*innerHeight;
+    const sxB=(vB.x+1)/2*innerWidth, syB=(-vB.y+1)/2*innerHeight;
+    const OFFSET = 160 + 30*Math.min(1,p/0.12);
+    const lxA=sxA+Math.cos(this._angA)*OFFSET, lyA=syA+Math.sin(this._angA)*OFFSET;
+    const lxB=sxB+Math.cos(this._angB)*OFFSET, lyB=syB+Math.sin(this._angB)*OFFSET;
+    this.elA.style.left=lxA+'px'; this.elA.style.top=lyA+'px'; this.elA.style.opacity=opacity;
+    this.elB.style.left=lxB+'px'; this.elB.style.top=lyB+'px'; this.elB.style.opacity=opacity;
+    const lo=opacity*0.35;
+    this.lnA.setAttribute('x1',sxA);this.lnA.setAttribute('y1',syA);this.lnA.setAttribute('x2',lxA);this.lnA.setAttribute('y2',lyA);this.lnA.setAttribute('opacity',lo);
+    this.lnB.setAttribute('x1',sxB);this.lnB.setAttribute('y1',syB);this.lnB.setAttribute('x2',lxB);this.lnB.setAttribute('y2',lyB);this.lnB.setAttribute('opacity',lo);
+    return true;
+  }
+  destroy() { this.elA.remove(); this.elB.remove(); this.svg.remove(); }
+}
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let nameWaves      = [];
+let arcs           = [];
+let particleFlows  = [];
+let clashBursts    = [];
+let collisionLabels = [];
+let nameIdCnt = 0;
+let busy      = false;
+
+// ── Relationship web ──────────────────────────────────────────────────────────
+const relationLines = new Map();
+
+function updateRelationshipWeb() {
+  const active = new Set();
+  for (let i = 0; i < nameWaves.length; i++) {
+    for (let j = i+1; j < nameWaves.length; j++) {
+      const a = nameWaves[i], b = nameWaves[j];
+      if (!a._launched||!b._launched||!a._fullyDrawn||!b._fullyDrawn) continue;
+      const sh = a.sharedLetters(b);
+      if (!sh.length) continue;
+      const key = `${Math.min(a.id,b.id)}_${Math.max(a.id,b.id)}`;
+      active.add(key);
+      if (!relationLines.has(key)) {
+        const pts = new Float32Array(6);
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(pts, 3));
+        const mat = new THREE.LineBasicMaterial({
+          color: a.sig.color.clone().lerp(b.sig.color, 0.5),
+          opacity: 0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
+        });
+        const line = new THREE.Line(geo, mat);
+        scene.add(line);
+        relationLines.set(key, { line, mat, geo, a, b });
+      }
+      const rl = relationLines.get(key);
+      const pos = rl.geo.attributes.position.array;
+      pos[0]=a.center.x;pos[1]=a.center.y;pos[2]=a.center.z;
+      pos[3]=b.center.x;pos[4]=b.center.y;pos[5]=b.center.z;
+      rl.geo.attributes.position.needsUpdate = true;
+      const dist = a.center.distanceTo(b.center);
+      const prox = Math.max(0, 1 - dist/18);
+      const pulse = 0.038 + 0.022*Math.sin(elapsed*0.65+a.id*1.57+b.id*0.91);
+      rl.mat.opacity = prox*pulse*Math.min(1,sh.length*0.6);
+      rl.mat.color.copy(a.sig.color).lerp(b.sig.color, 0.5);
+    }
+  }
+  relationLines.forEach((rl, key) => {
+    if (!active.has(key)) { scene.remove(rl.line); relationLines.delete(key); }
+  });
+}
+
+// ── Physics ───────────────────────────────────────────────────────────────────
+function applyAttractions(dt) {
+  for (let i = 0; i < nameWaves.length; i++) {
+    for (let j = i+1; j < nameWaves.length; j++) {
+      const a = nameWaves[i], b = nameWaves[j];
+      if (!a._launched||!b._launched) continue;
+      const sh = a.sharedLetters(b);
+      if (!sh.length) continue;
+      const diff = b.center.clone().sub(a.center);
+      const dist = diff.length();
+      if (dist < 0.5) continue;
+      const f = diff.normalize().multiplyScalar(0.00022*sh.length*dt);
+      a._orbOffset.add(f); b._orbOffset.sub(f);
+    }
+  }
+}
+
+function checkTouches() {
+  for (let i = 0; i < nameWaves.length; i++) {
+    for (let j = i+1; j < nameWaves.length; j++) {
+      const a = nameWaves[i], b = nameWaves[j];
+      if (!a.canTouch()||!b.canTouch()) continue;
+      if (a.center.distanceTo(b.center) > 6.5) continue;
+      a.markTouched(); b.markTouched();
+      a.flash(); b.flash();
+      const mid = a.center.clone().add(b.center).multiplyScalar(0.5);
+      clashBursts.push(new ClashBurst(mid, a.sig.color, b.sig.color));
+      collisionLabels.push(new CollisionLabel(a.center, b.center, a.name, a.sig.hex, b.name, b.sig.hex));
+      arcs.push(new TouchArc(a.center.clone(), b.center.clone(),
+        new THREE.Color(a.sig.hex).lerp(new THREE.Color(b.sig.hex), 0.5)));
+      const sh = a.sharedLetters(b);
+      const dist = a.center.distanceTo(b.center);
+      if (sh.length && dist < 3.5 && a.isReadyToExchange && b.isReadyToExchange) {
+        particleFlows.push(new ParticleFlow(a.center, b.center, a.sig.color, b.sig.color));
+        particleFlows.push(new ParticleFlow(b.center, a.center, b.sig.color, a.sig.color));
+        a.applyExchange(b); b.applyExchange(a);
+      }
+    }
+  }
+}
+
+// ── Labels ────────────────────────────────────────────────────────────────────
+const labelsEl  = document.getElementById('labels');
+const labelPool = {};
+
+function showLabel(wave, dur = 3.2) {
+  if (!labelPool[wave.id]) {
+    const el = document.createElement('div');
+    el.className = 'univ-label'; el.textContent = wave.name;
+    el.style.color = wave.sig.hex; el.style.opacity = 0;
+    labelsEl.appendChild(el);
+    labelPool[wave.id] = { el, opacity: 0, timer: 0 };
+  }
+  labelPool[wave.id].timer = dur;
+}
+
+function updateLabels(dt) {
+  Object.entries(labelPool).forEach(([id, lp]) => {
+    const w = nameWaves.find(w => w.id === +id);
+    if (!w) return;
+    lp.timer = Math.max(0, lp.timer - dt);
+    const target = lp.timer > 0 ? 0.9 : 0;
+    lp.opacity += (target - lp.opacity) * Math.min(1, 3*dt);
+    lp.el.style.opacity = lp.opacity;
+    if (lp.opacity > 0.01) {
+      const v = w.center.clone().project(camera);
+      lp.el.style.left = ((v.x+1)/2*innerWidth)  + 'px';
+      lp.el.style.top  = ((-v.y+1)/2*innerHeight - 28) + 'px';
+    }
+  });
+}
+
+// ── Persistence ───────────────────────────────────────────────────────────────
+const DAY_KEY = 'clifford_' + new Date().toDateString();
+function loadSaved() { try { return JSON.parse(localStorage.getItem(DAY_KEY) || '[]'); } catch { return []; } }
+function saveName(n) { const a = loadSaved(); a.push(n); try { localStorage.setItem(DAY_KEY, JSON.stringify(a)); } catch {} }
+
+// ── Spawn — wave-first, then overlay sequence ─────────────────────────────────
+async function spawnName(name) {
+  if (busy) return;
+  busy = true;
+
+  // Wave created FIRST — immediately at orbital position, full opacity, already orbiting
+  const id   = nameIdCnt++;
+  const wave = new NameWave(name, id, true);
+  nameWaves.push(wave);
+  while (nameWaves.length > 10) nameWaves.shift().destroy();
+  document.getElementById('count').textContent = nameWaves.length;
+
+  // Overlay runs AFTER — wave already visible behind it
+  await runSequence(name, wave.sig, wave.params);
+
+  // Label appears once overlay closes
+  showLabel(wave, 3.5);
+  busy = false;
+}
+
+// Pre-load saved names (same key as main app)
+const _saved = loadSaved();
+const _toLoad = _saved.length ? _saved.slice(-8) : ['RESONANZ','CLIFFORD','BERLIN','UYEN','KOSMOS'];
+_toLoad.forEach(n => {
+  const id = nameIdCnt++;
+  const w  = new NameWave(n, id, true);
+  nameWaves.push(w);
+});
+document.getElementById('count').textContent = nameWaves.length;
+
+// ── Clear all ─────────────────────────────────────────────────────────────────
+function clearAll() {
+  nameWaves.forEach(w => w.destroy()); nameWaves = [];
+  arcs.forEach(a => a.destroy()); arcs = [];
+  particleFlows.forEach(pf => pf.destroy()); particleFlows = [];
+  clashBursts.forEach(cb => cb.destroy()); clashBursts = [];
+  collisionLabels.forEach(cl => cl.destroy()); collisionLabels = [];
+  relationLines.forEach(rl => scene.remove(rl.line)); relationLines.clear();
+  Object.values(labelPool).forEach(lp => lp.el.remove());
+  Object.keys(labelPool).forEach(k => delete labelPool[k]);
+  document.getElementById('count').textContent = 0;
+}
+
+// ── Input ─────────────────────────────────────────────────────────────────────
+function submit() {
+  const v = document.getElementById('name-input').value.trim();
+  if (!v) return;
+  document.getElementById('name-input').value = '';
+  saveName(v);
+  spawnName(v);
+}
+document.getElementById('name-input').addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+document.getElementById('send-btn').addEventListener('click', submit);
+document.addEventListener('keydown', e => { if (e.shiftKey && e.key === 'Backspace') { e.preventDefault(); clearAll(); } });
+
+// ── Render loop ───────────────────────────────────────────────────────────────
+const clock = new THREE.Clock();
+let elapsed = 0, frame = 0, camAngle = 0;
+
+(function tick() {
+  requestAnimationFrame(tick);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  elapsed += dt; frame++;
+
+  camAngle += dt * 0.02;
+  camera.position.x = Math.sin(camAngle) * 22;
+  camera.position.y = 2 + Math.sin(elapsed * 0.055) * 2;
+  camera.position.z = Math.cos(camAngle) * 22;
+  camera.lookAt(0, 0, 0);
+
+  nameWaves.forEach(w => w.update(dt));
+  nameWaves = nameWaves.filter(w => { if (w.dead) { w.destroy(); return false; } return true; });
+
+  if (frame % 2 === 0) applyAttractions(dt * 2);
+  if (frame % 3 === 0) checkTouches();
+
+  arcs           = arcs.filter(a  => { const alive = a.update(dt);  if (!alive) a.destroy();  return alive; });
+  particleFlows  = particleFlows.filter(pf => pf.update(dt));
+  clashBursts    = clashBursts.filter(cb => cb.update(dt));
+  collisionLabels = collisionLabels.filter(cl => cl.update(dt));
+
+  updateLabels(dt);
+  updateRelationshipWeb();
+
+  renderer.render(scene, camera);
+}());
+
+// ── Resize ────────────────────────────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
