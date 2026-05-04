@@ -1223,6 +1223,8 @@ let sessionPhase    = 'running'; // running | lockout | chaos | result | flash
 let votesDie = 0, votesLive = 0;
 const votedIds = new Set();
 let sessionChaosSpeed = 1;
+let liveAsAllShake  = 0;   // extra camera shake set by runLiveAsAll, read by render loop
+let survivorWave    = null; // NameWave reference kept alive across session reset
 let displayMqttRef  = null;
 let broadcastAccum  = 0;
 let resultExecuted  = false;
@@ -1476,29 +1478,104 @@ async function runDieAsOne() {
   }
 }
 
-// LIVE AS ALL — gather to centre, create merged survivor
+// LIVE AS ALL — dramatic multi-phase fusion sequence
 async function runLiveAsAll() {
   const waves = nameWaves.filter(w => !w.dead);
   if (!waves.length) return;
-  const starts = waves.map(w => w.center.clone());
-  const target = new THREE.Vector3(0, 0, 0);
-  const dur = 7000;
-  const t0 = Date.now();
-  await new Promise(resolve => {
-    const iv = setInterval(() => {
-      const p = Math.min(1, (Date.now() - t0) / dur);
-      const e = p < 0.5 ? 2*p*p : -1+(4-2*p)*p;
-      waves.forEach((w, i) => { if (!w.dead) { w.center.lerpVectors(starts[i], target, e); w.group.position.copy(w.center); } });
-      if (p >= 1) { clearInterval(iv); resolve(); }
-    }, 16);
-  });
+
+  // Compute + save merged params immediately so reset always finds them
   const avg = { a:0, b:0, c:0, d:0 };
   waves.forEach(w => { avg.a+=w.params.a; avg.b+=w.params.b; avg.c+=w.params.c; avg.d+=w.params.d; });
-  const n = waves.length;
-  avg.a/=n; avg.b/=n; avg.c/=n; avg.d/=n;
-  waves.forEach(w => { w.dead = true; });
+  const wn = waves.length;
+  avg.a/=wn; avg.b/=wn; avg.c/=wn; avg.d/=wn;
   localStorage.setItem('clf-survivor', JSON.stringify({ params: avg, name: 'COLLECTIVE' }));
-  await new Promise(r => setTimeout(r, 100));
+
+  const starts = waves.map(w => w.center.clone());
+  const origin = new THREE.Vector3(0, 0, 0);
+  // Compute blended color of all waves
+  const blendColor = new THREE.Color(0, 0, 0);
+  waves.forEach(w => blendColor.add(w.sig.color.clone().multiplyScalar(1 / wn)));
+
+  function phase(ms) {
+    const t0 = Date.now();
+    return cb => new Promise(resolve => {
+      const iv = setInterval(() => {
+        const p = Math.min(1, (Date.now() - t0) / ms);
+        cb(p, iv);
+        if (p >= 1) { clearInterval(iv); resolve(); }
+      }, 16);
+    });
+  }
+
+  // ── Phase 1 (0–3 s): awakening — glow up, spin faster ────────────────────
+  await phase(3000)(p => {
+    sessionChaosSpeed = 1 + p * 7;
+    waves.forEach(w => {
+      if (w.dead) return;
+      w.mat.opacity  = Math.min(1.0, 0.65 + p * 0.35);
+      w.mat2.opacity = Math.min(0.55, 0.16 + p * 0.39);
+    });
+  });
+
+  // ── Phase 2 (3–9 s): attraction — spiral inward, colors bleed ─────────────
+  await phase(6000)(p => {
+    sessionChaosSpeed = 8 + p * 7;
+    liveAsAllShake = p * 0.15;
+    waves.forEach((w, i) => {
+      if (w.dead) return;
+      // Oscillating approach: three rushes, each closer
+      const rushT = p * 3;
+      const rush  = Math.abs(Math.sin(rushT * Math.PI)); // 0→1→0→1→0→1
+      const depth = p * p; // overall inward progress
+      const target = starts[i].clone().lerp(origin, depth * 0.7 + rush * 0.25);
+      w.center.copy(target);
+      w.group.position.copy(w.center);
+      // Color bleed toward unified blend
+      w.mat.color.lerp(blendColor, 0.04);
+      w.mat2.color.lerp(blendColor, 0.04);
+    });
+  });
+
+  // ── Phase 3 (9–13 s): convergence — violent crash, extreme shake ──────────
+  const preCollisionPositions = waves.map(w => w.center.clone());
+  await phase(4000)(p => {
+    sessionChaosSpeed = 15 + p * 10;
+    liveAsAllShake = 0.15 + p * 0.7;
+    const ease = p * p;
+    waves.forEach((w, i) => {
+      if (w.dead) return;
+      w.center.lerpVectors(preCollisionPositions[i], origin, ease);
+      w.group.position.copy(w.center);
+      w.mat.color.lerp(blendColor, 0.08);
+      w.mat2.color.lerp(blendColor, 0.08);
+      w.mat.opacity  = Math.min(1.0, w.mat.opacity);
+    });
+  });
+
+  // ── Phase 4 (13–14 s): FUSION — flash, individual waves vanish ───────────
+  const fl = document.getElementById('white-flash');
+  if (fl) {
+    fl.style.transition = 'opacity 0.25s ease';
+    fl.style.opacity = '0.85';
+    setTimeout(() => { fl.style.transition = 'opacity 0.6s ease'; fl.style.opacity = '0'; }, 300);
+  }
+  liveAsAllShake = 1.2;
+  await phase(1000)(p => {
+    waves.forEach(w => {
+      if (w.dead) return;
+      w.mat.opacity  = Math.max(0, 1.0 - p * 2);
+      w.mat2.opacity = Math.max(0, 0.55 - p * 1.1);
+      w.orbMat.opacity = Math.max(0, 0.13 - p * 0.26);
+      if (w.mat.opacity <= 0) w.dead = true;
+    });
+  });
+  waves.forEach(w => { w.dead = true; });
+
+  // ── Phase 5 (14–20 s): birth — merged attractor emerges ──────────────────
+  liveAsAllShake = 0.4;
+  sessionChaosSpeed = 1;
+  await new Promise(r => setTimeout(r, 120));
+
   const merged = new NameWave('COLLECTIVE', nameIdCnt++, true);
   merged.params = avg;
   const pts = generateClifford3D(avg, MAX_PTS);
@@ -1506,7 +1583,22 @@ async function runLiveAsAll() {
   merged.cloud.geometry.attributes.position.needsUpdate = true;
   merged.cloud2.geometry.attributes.position.array.set(pts);
   merged.cloud2.geometry.attributes.position.needsUpdate = true;
+  merged.mat.opacity = 0; merged.mat2.opacity = 0; merged.orbMat.opacity = 0;
+  merged.group.scale.setScalar(3.5);
+  merged.group.position.set(0, 0, 0);
   nameWaves.push(merged);
+  survivorWave = merged; // keep reference across reset
+
+  await phase(6000)(p => {
+    const ease = p < 0.5 ? 2*p*p : -1+(4-2*p)*p;
+    merged.group.scale.setScalar(3.5 - ease * 2.5); // 3.5 → 1.0
+    merged.mat.opacity  = Math.min(0.65, p * 1.3);
+    merged.mat2.opacity = Math.min(0.16, p * 0.32);
+    merged.orbMat.opacity = Math.min(0.13, p * 0.26);
+    liveAsAllShake = Math.max(0, 0.4 - p * 0.45);
+  });
+
+  liveAsAllShake = 0;
 }
 
 function doWhiteFlash() {
@@ -1521,25 +1613,40 @@ function doWhiteFlash() {
 }
 
 function resetSession() {
-  const survivor = (() => { try { return JSON.parse(localStorage.getItem('clf-survivor')||'null'); } catch(_){return null;} })();
+  // Pull survivor out of nameWaves BEFORE clearAll so its Three.js objects survive
+  const sw = survivorWave;
+  survivorWave = null;
+  if (sw) nameWaves = nameWaves.filter(w => w !== sw);
+
   clearAll();
   sessionElapsed = 0; sessionPhase = 'running';
   votesDie = 0; votesLive = 0; votedIds.clear();
-  sessionChaosSpeed = 1; resultExecuted = false; broadcastAccum = 0;
+  sessionChaosSpeed = 1; liveAsAllShake = 0; resultExecuted = false; broadcastAccum = 0;
   const cc = document.getElementById('chaos-chart');
   if (cc) cc.classList.remove('visible');
   updateSessionTimerEl(300);
-  if (survivor && survivor.params) {
-    const w = new NameWave(survivor.name || 'COLLECTIVE', nameIdCnt++, true);
-    w.params = survivor.params;
-    const pts = generateClifford3D(survivor.params, MAX_PTS);
-    w.cloud.geometry.attributes.position.array.set(pts.slice());
-    w.cloud.geometry.attributes.position.needsUpdate = true;
-    w.cloud2.geometry.attributes.position.array.set(pts);
-    w.cloud2.geometry.attributes.position.needsUpdate = true;
-    nameWaves.push(w);
+
+  if (sw) {
+    // Reuse the live NameWave — reset its orbital state so it behaves naturally
+    sw.age = 0; sw._launched = true;
+    sw.center.set(0, 0, 0); sw.group.position.set(0, 0, 0);
+    sw.group.scale.setScalar(1);
+    nameWaves.push(sw);
   } else {
-    ['RESONANZ','CLIFFORD','BERLIN','UYEN','KOSMOS'].forEach(n => nameWaves.push(new NameWave(n, nameIdCnt++, true)));
+    // Fallback: try localStorage, else defaults
+    const stored = (() => { try { return JSON.parse(localStorage.getItem('clf-survivor')||'null'); } catch(_){return null;} })();
+    if (stored && stored.params) {
+      const w = new NameWave(stored.name || 'COLLECTIVE', nameIdCnt++, true);
+      w.params = stored.params;
+      const pts = generateClifford3D(stored.params, MAX_PTS);
+      w.cloud.geometry.attributes.position.array.set(pts.slice());
+      w.cloud.geometry.attributes.position.needsUpdate = true;
+      w.cloud2.geometry.attributes.position.array.set(pts);
+      w.cloud2.geometry.attributes.position.needsUpdate = true;
+      nameWaves.push(w);
+    } else {
+      ['RESONANZ','CLIFFORD','BERLIN','UYEN','KOSMOS'].forEach(n => nameWaves.push(new NameWave(n, nameIdCnt++, true)));
+    }
   }
 }
 
@@ -1616,8 +1723,9 @@ let elapsed = 0, frame = 0, camAngle = 0;
   camera.position.x = Math.sin(camAngle) * 22;
   camera.position.y = 2 + Math.sin(elapsed * 0.055) * 2;
   camera.position.z = Math.cos(camAngle) * 22;
-  if (sessionPhase === 'chaos' || sessionPhase === 'result') {
-    const shake = (sessionPhase === 'chaos' ? (sessionChaosSpeed - 1) * 0.09 : 0.05);
+  if (sessionPhase === 'chaos' || sessionPhase === 'result' || liveAsAllShake > 0) {
+    const shake = liveAsAllShake > 0 ? liveAsAllShake
+      : (sessionPhase === 'chaos' ? (sessionChaosSpeed - 1) * 0.09 : 0.05);
     camera.position.x += (Math.random() - 0.5) * shake;
     camera.position.y += (Math.random() - 0.5) * shake;
     camera.position.z += (Math.random() - 0.5) * shake;
