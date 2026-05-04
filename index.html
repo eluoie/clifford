@@ -2098,6 +2098,7 @@ function resetSession() {
   votesDie = 0; votesLive = 0; votedIds.clear();
   sessionChaosSpeed = 1; liveAsAllShake = 0; resultExecuted = false; broadcastAccum = 0;
   _infoIdx = 0; _infoTransitioning = false;
+  if (_infoFadeOutTimer) { clearTimeout(_infoFadeOutTimer); _infoFadeOutTimer = null; }
   const _ib = document.getElementById('info-box'); if (_ib) _ib.classList.remove('info-visible');
   updateSessionTimerEl(300);
 
@@ -2186,6 +2187,29 @@ const INFO_ENTRIES = [
 ];
 let _infoIdx = 0;
 let _infoTransitioning = false;
+let _infoFadeOutTimer = null;
+
+function _infoStartTyping(box, txt, text) {
+  // Wait for fade-in transition (0.9s) to finish before typing begins
+  setTimeout(() => {
+    let i = 0;
+    const cursor = document.createElement('span');
+    cursor.className = 'info-cursor';
+    txt.textContent = '';
+    txt.appendChild(cursor);
+    const iv = setInterval(() => {
+      cursor.insertAdjacentText('beforebegin', text[i++]);
+      if (i >= text.length) {
+        clearInterval(iv);
+        // Fade out 10 s after typing finishes
+        _infoFadeOutTimer = setTimeout(() => {
+          box.classList.remove('info-visible');
+          _infoFadeOutTimer = null;
+        }, 10000);
+      }
+    }, 62);
+  }, 920);
+}
 
 function tickInfoBox() {
   if (_infoIdx >= INFO_ENTRIES.length || sessionElapsed > 180) return;
@@ -2197,22 +2221,16 @@ function tickInfoBox() {
   const txt = document.getElementById('info-text');
   if (!box || !txt) { _infoTransitioning = false; return; }
 
+  // Cancel any pending fade-out from the previous box
+  if (_infoFadeOutTimer) { clearTimeout(_infoFadeOutTimer); _infoFadeOutTimer = null; }
+
   const entry = INFO_ENTRIES[_infoIdx++];
   const wasVisible = box.classList.contains('info-visible');
 
   const show = () => {
     box.classList.add('info-visible');
     _infoTransitioning = false;
-    // Typing animation
-    let i = 0;
-    const cursor = document.createElement('span');
-    cursor.className = 'info-cursor';
-    txt.textContent = '';
-    txt.appendChild(cursor);
-    const iv = setInterval(() => {
-      cursor.insertAdjacentText('beforebegin', entry.text[i++]);
-      if (i >= entry.text.length) clearInterval(iv);
-    }, 62);
+    _infoStartTyping(box, txt, entry.text);
   };
 
   if (wasVisible) {
