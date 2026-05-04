@@ -195,7 +195,7 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<script src="https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js"></script>
 <script>
 'use strict';
 
@@ -256,13 +256,14 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
 </div>`;
   const field  = document.getElementById('ip-field');
   const status = document.getElementById('ip-status');
-  const mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
+  let mqttClient;
+  try { mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt'); } catch(e) {}
   function send() {
     const word = field.value.trim();
     if (!word || !topic) return;
     document.getElementById('ip-btn').disabled = true;
     try {
-      mqttClient.publish('clifford/' + topic, word);
+      if (mqttClient) mqttClient.publish('clifford/' + topic, word);
       field.value = '';
       status.textContent = 'sent ✓';
       setTimeout(() => { status.textContent = ''; }, 2000);
@@ -1291,12 +1292,14 @@ function clearAll() {
     correctLevel: QRCode.CorrectLevel.M
   });
 
-  const client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
-  client.on('connect', () => { client.subscribe('clifford/' + topic); });
-  client.on('message', (t, payload) => {
-    const word = payload.toString().trim();
-    if (word) { saveName(word); spawnName(word); }
-  });
+  try {
+    const client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
+    client.on('connect', () => { client.subscribe('clifford/' + topic); });
+    client.on('message', (t, payload) => {
+      const word = payload.toString().trim();
+      if (word) { saveName(word); spawnName(word); }
+    });
+  } catch(e) { console.warn('MQTT init failed:', e); }
 })();
 
 document.addEventListener('keydown', e => { if (e.shiftKey && e.key === 'Backspace') { e.preventDefault(); clearAll(); } });
