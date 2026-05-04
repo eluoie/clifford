@@ -1911,13 +1911,12 @@ async function runLiveAsAll() {
 
   const blendColor = new THREE.Color(0, 0, 0);
   waves.forEach(w => blendColor.add(w.sig.color.clone().multiplyScalar(1 / wn)));
-  const blendHex = '#' + blendColor.getHexString();
 
   // ── Pre-compute merged geometry + snapshot originals ──────────────────────
   const mergedPts = generateClifford3D(avg, MAX_PTS);
   const origPts   = waves.map(w => new Float32Array(w.cloud.geometry.attributes.position.array));
 
-  // ── Create merged wave (totally hidden, drawRange=0) ──────────────────────
+  // ── Create merged wave (hidden, drawRange=0) ──────────────────────────────
   const merged = new NameWave('COLLECTIVE', nameIdCnt++, true);
   merged.params = avg;
   merged.cloud.geometry.attributes.position.array.set(mergedPts.slice());
@@ -1929,25 +1928,10 @@ async function runLiveAsAll() {
   merged.mat.color.copy(blendColor);
   merged.mat2.color.copy(blendColor);
   merged.orbMat.color.copy(blendColor);
-  merged.mat.opacity = 0.75; merged.mat2.opacity = 0.22; merged.orbMat.opacity = 0;
+  merged.mat.opacity = 0; merged.mat2.opacity = 0; merged.orbMat.opacity = 0;
   merged.group.position.set(0, 0, 0);
   nameWaves.push(merged);
   survivorWave = merged;
-
-  // ── Centered result overlay ────────────────────────────────────────────────
-  const ov = document.createElement('div');
-  ov.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:48;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;opacity:0;transition:opacity 1s ease;';
-  const ovNames = document.createElement('div');
-  ovNames.style.cssText = `font-size:9px;letter-spacing:0.5em;text-transform:uppercase;font-family:monospace;color:rgba(255,255,255,0.3);text-align:center;`;
-  ovNames.textContent = waves.map(w => w.name).join(' · ');
-  const ovTitle = document.createElement('div');
-  ovTitle.style.cssText = `font-size:52px;font-weight:200;letter-spacing:0.35em;text-transform:uppercase;font-family:monospace;color:${blendHex};text-shadow:0 0 60px ${blendHex},0 0 120px ${blendHex};text-align:center;`;
-  ovTitle.textContent = 'COLLECTIVE';
-  const ovSub = document.createElement('div');
-  ovSub.style.cssText = 'font-size:8px;letter-spacing:0.4em;text-transform:uppercase;font-family:monospace;color:rgba(255,255,255,0.2);text-align:center;margin-top:4px;';
-  ovSub.textContent = wn + ' identit' + (wn === 1 ? 'y' : 'ies') + ' converged';
-  ov.appendChild(ovNames); ov.appendChild(ovTitle); ov.appendChild(ovSub);
-  document.body.appendChild(ov);
 
   const starts = waves.map(w => w.center.clone());
   const origin  = new THREE.Vector3(0, 0, 0);
@@ -1965,52 +1949,55 @@ async function runLiveAsAll() {
 
   // ── Phase 1 (0–2 s): awakening — glow up, spin up ────────────────────────
   await phase(2000)(p => {
-    sessionChaosSpeed = 1 + p * 5;
+    sessionChaosSpeed = 1 + p * 6;
     waves.forEach(w => {
       if (w.dead) return;
       w.mat.opacity  = Math.min(1.0, 0.65 + p * 0.35);
-      w.mat2.opacity = Math.min(0.55, 0.16 + p * 0.35);
+      w.mat2.opacity = Math.min(0.55, 0.16 + p * 0.39);
     });
   });
 
-  // ── Phase 2 (2–7 s): gathering — drift + morph toward merged form ─────────
-  await phase(5000)(p => {
-    sessionChaosSpeed = 5 + p * 5;
-    liveAsAllShake = p * 0.1;
-    const ease = p * p;
+  // ── Phase 2 (2–8 s): tangle — interweaving geometry morph + convergence ───
+  // Each wave morphs with a per-wave oscillating phase offset so shapes
+  // visibly tangle and mingle as they converge spatially.
+  await phase(6000)(p => {
+    sessionChaosSpeed = 6 + p * 7;
+    liveAsAllShake = p * 0.14;
+    const easeIn = p * p;
     waves.forEach((w, i) => {
       if (w.dead) return;
-      // Spiral inward with gentle pulse
-      const pulse = Math.sin(p * Math.PI * 3) * 0.08 * (1 - p);
-      w.center.lerpVectors(starts[i], origin, ease * 0.6 + pulse);
+      // Pull toward center — fully overlapping by end
+      w.center.lerpVectors(starts[i], origin, easeIn * 0.9);
       w.group.position.copy(w.center);
-      // Color bleeds toward blend
-      w.mat.color.lerp(blendColor, 0.025);
-      w.mat2.color.lerp(blendColor, 0.025);
-      // Geometry starts morphing toward merged shape
-      const pos = w.cloud.geometry.attributes.position.array;
+      // Color bleeds aggressively toward blend
+      w.mat.color.lerp(blendColor, 0.05);
+      w.mat2.color.lerp(blendColor, 0.05);
+      // Geometry morph with per-wave oscillation — the phase offset (i * 1.4)
+      // makes waves morph at different rhythms, creating the tangling visual
+      const osc   = Math.sin(p * Math.PI * 6 + i * 1.4) * 0.18 * (1 - easeIn);
+      const morphT = Math.min(1, Math.max(0, easeIn + osc));
+      const pos  = w.cloud.geometry.attributes.position.array;
       const orig = origPts[i];
       for (let k = 0; k < pos.length; k++)
-        pos[k] = orig[k] + (mergedPts[k] - orig[k]) * ease * 0.5;
+        pos[k] = orig[k] + (mergedPts[k] - orig[k]) * morphT;
       w.cloud.geometry.attributes.position.needsUpdate = true;
     });
   });
 
-  // ── Phase 3 (7–9 s): convergence crash — all collapse to origin ───────────
+  // ── Phase 3 (8–10.5 s): final crash — collapse, full fade, fusion flash ───
   const preM = waves.map(w => w.center.clone());
-  await phase(2000)(p => {
-    sessionChaosSpeed = 10 + p * 8;
-    liveAsAllShake = 0.1 + p * 0.55;
+  await phase(2500)(p => {
+    sessionChaosSpeed = 13 + p * 8;
+    liveAsAllShake = 0.14 + p * 0.66;
     const ease = p * p;
     waves.forEach((w, i) => {
       if (w.dead) return;
       w.center.lerpVectors(preM[i], origin, ease);
       w.group.position.copy(w.center);
-      w.mat.color.lerp(blendColor, 0.08);
-      w.mat2.color.lerp(blendColor, 0.08);
-      // Fade out as they arrive
-      const fadeOut = Math.max(0, 1 - p * 1.4);
-      w.mat.opacity    = 0.65 * fadeOut;
+      w.mat.color.lerp(blendColor, 0.14);
+      w.mat2.color.lerp(blendColor, 0.14);
+      const fadeOut = Math.max(0, 1 - p * 1.5);
+      w.mat.opacity    = fadeOut;
       w.mat2.opacity   = 0.55 * fadeOut;
       w.orbMat.opacity = 0.13 * fadeOut;
       if (fadeOut < 0.01) w.dead = true;
@@ -2018,40 +2005,70 @@ async function runLiveAsAll() {
   });
   waves.forEach(w => { w.dead = true; });
 
-  // Flash at moment of fusion
+  // Fusion flash
   const fl = document.getElementById('white-flash');
   if (fl) {
-    fl.style.transition = 'none'; fl.style.opacity = '0.6';
-    setTimeout(() => { fl.style.transition = 'opacity 0.8s ease'; fl.style.opacity = '0'; }, 80);
+    fl.style.transition = 'none'; fl.style.opacity = '0.7';
+    setTimeout(() => { fl.style.transition = 'opacity 1.2s ease'; fl.style.opacity = '0'; }, 80);
   }
-  liveAsAllShake = 0.8;
+  liveAsAllShake = 0.9;
 
-  // ── Phase 4 (9–16 s): FORMATION — merged attractor builds up at center ─────
-  // drawRange goes 0 → MAX_PTS, making the new shape visibly emerge point by point
-  ov.style.opacity = '1'; // reveal overlay
-  await phase(7000)(p => {
+  // ── Phase 4 (10.5–15.5 s): merged attractor builds point-by-point in 3D ──
+  await phase(5000)(p => {
     const ease = p < 0.5 ? 2*p*p : -1+(4-2*p)*p;
-    sessionChaosSpeed = Math.max(2, 18 - ease * 16);
-    liveAsAllShake = Math.max(0, 0.8 - ease * 0.75);
-    // Build merged attractor point by point
+    sessionChaosSpeed = Math.max(2, 16 - ease * 14);
+    liveAsAllShake = Math.max(0, 0.9 - ease * 0.85);
+    merged.mat.opacity  = ease * 0.75;
+    merged.mat2.opacity = ease * 0.22;
     const drawCount = Math.floor(ease * MAX_PTS);
     merged.cloud.geometry.setDrawRange(0, drawCount);
     merged.cloud2.geometry.setDrawRange(0, Math.floor(drawCount * 0.4));
     merged.group.position.set(0, 0, 0);
   });
 
-  // ── Phase 5 (16–20 s): established — orbits freely, overlay fades ─────────
+  // ── Phase 5 (15.5–19.5 s): 2D attractor overlay — the new form revealed ──
   merged.cloud.geometry.setDrawRange(0, MAX_PTS);
   merged.cloud2.geometry.setDrawRange(0, MAX_PTS);
-  liveAsAllShake = 0;
-  sessionChaosSpeed = 1;
+  merged.mat.opacity = 0.75; merged.mat2.opacity = 0.22;
+  liveAsAllShake = 0; sessionChaosSpeed = 1.5;
 
-  // Fade overlay after a moment
-  setTimeout(() => { ov.style.opacity = '0'; }, 800);
+  // Render merged attractor to a 2D canvas
+  const SZ = Math.round(Math.min(innerWidth, innerHeight) * 0.6);
+  const cvs = document.createElement('canvas');
+  cvs.width = SZ; cvs.height = SZ;
+  const c2 = cvs.getContext('2d');
+  let mnX=Infinity, mxX=-Infinity, mnY=Infinity, mxY=-Infinity;
+  for (let k = 0; k < mergedPts.length; k += 3) {
+    if (mergedPts[k] < mnX) mnX = mergedPts[k];
+    if (mergedPts[k] > mxX) mxX = mergedPts[k];
+    if (mergedPts[k+1] < mnY) mnY = mergedPts[k+1];
+    if (mergedPts[k+1] > mxY) mxY = mergedPts[k+1];
+  }
+  const pad = 24;
+  const sc2 = Math.min((SZ - pad*2) / (mxX - mnX), (SZ - pad*2) / (mxY - mnY));
+  const cr = Math.round(blendColor.r*255), cg = Math.round(blendColor.g*255), cb2 = Math.round(blendColor.b*255);
+  c2.fillStyle = `rgba(${cr},${cg},${cb2},0.22)`;
+  for (let k = 0; k < mergedPts.length; k += 3) {
+    const px = (mergedPts[k]   - mnX) * sc2 + pad;
+    const py = SZ - ((mergedPts[k+1] - mnY) * sc2 + pad);
+    c2.fillRect(px, py, 1.4, 1.4);
+  }
+
+  // Overlay container
+  const ov = document.createElement('div');
+  ov.style.cssText = [
+    'position:fixed;inset:0;z-index:48;pointer-events:none;',
+    'display:flex;align-items:center;justify-content:center;',
+    'opacity:0;transition:opacity 1.6s ease;',
+    'background:rgba(0,0,0,0.55);backdrop-filter:blur(3px);',
+  ].join('');
+  cvs.style.cssText = `border-radius:2px;box-shadow:0 0 80px rgba(${cr},${cg},${cb2},0.3),0 0 160px rgba(${cr},${cg},${cb2},0.12);`;
+  ov.appendChild(cvs);
+  document.body.appendChild(ov);
+  requestAnimationFrame(() => requestAnimationFrame(() => { ov.style.opacity = '1'; }));
+
   await phase(4000)(p => {
-    merged.mat.opacity    = Math.min(0.75, 0.65 + p * 0.1);
-    merged.mat2.opacity   = Math.min(0.22, 0.18 + p * 0.04);
-    merged.orbMat.opacity = Math.min(0.13, p * 0.13);
+    merged.orbMat.opacity = p * 0.13;
   });
 
   ov.remove();
