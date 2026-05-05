@@ -181,7 +181,7 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
 #decision-overlay.visible { opacity: 1; }
 #decision-word {
   font-size: 18vw; font-weight: 200; letter-spacing: 0.38em;
-  text-transform: uppercase; font-family: monospace;
+  text-transform: uppercase; font-family: 'Courier New', Courier, monospace;
   line-height: 1; text-align: center;
   color: rgba(255,255,255,0.92);
   text-shadow: 0 0 80px rgba(255,255,255,0.25);
@@ -276,10 +276,15 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
   50%       { opacity: 0; }
 }
 
-/* ── White flash ──────────────────────────────────────────────────────────── */
+/* ── Cloud flash ───────────────────────────────────────────────────────────── */
 #white-flash {
-  position: fixed; inset: 0; z-index: 100; background: #fff;
-  opacity: 0; pointer-events: none; transition: opacity 0.4s ease;
+  position: fixed; inset: 0; z-index: 100;
+  background: #e8edf8; /* soft cloud-sky off-white */
+  opacity: 0; pointer-events: none;
+}
+#cloud-noise-canvas {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  filter: blur(88px) saturate(0.6);
 }
 
 
@@ -383,7 +388,7 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
 <div id="decision-overlay"><span id="decision-word"></span></div>
 
 <!-- ── White flash ───────────────────────────────────────────────────────── -->
-<div id="white-flash"></div>
+<div id="white-flash"><canvas id="cloud-noise-canvas"></canvas></div>
 
 <div id="ui">
   <div id="qr-wrap">
@@ -1998,8 +2003,8 @@ async function purgeBurst(wave, wordEl, duration = 3.0) {
   // Screen flash at detonation
   const fl = document.getElementById('white-flash');
   if (fl) {
-    fl.style.transition = 'none'; fl.style.opacity = '0.75';
-    setTimeout(() => { fl.style.transition = 'opacity 0.55s ease'; fl.style.opacity = '0'; }, 60);
+    fl.style.transition = 'opacity 0.18s ease'; fl.style.opacity = '0.45';
+    setTimeout(() => { fl.style.transition = 'opacity 0.7s ease'; fl.style.opacity = '0'; }, 200);
   }
 
   const DURATION = duration;
@@ -2246,8 +2251,8 @@ async function runLiveAsAll() {
   // ── REBIRTH FLASH ─────────────────────────────────────────────────────────
   const fl = document.getElementById('white-flash');
   if (fl) {
-    fl.style.transition = 'none'; fl.style.opacity = '1';
-    setTimeout(() => { fl.style.transition = 'opacity 2.2s ease'; fl.style.opacity = '0'; }, 140);
+    fl.style.transition = 'opacity 0.6s ease'; fl.style.opacity = '0.92';
+    setTimeout(() => { fl.style.transition = 'opacity 2.4s ease'; fl.style.opacity = '0'; }, 650);
   }
   liveAsAllShake = 1.8;
 
@@ -2339,14 +2344,72 @@ async function runLiveAsAll() {
 }
 
 function doWhiteFlash() {
-  const fl = document.getElementById('white-flash');
-  if (!fl) return;
-  fl.style.transition = 'none'; fl.style.opacity = '1';
-  setTimeout(() => {
-    fl.style.transition = 'opacity 1.2s ease';
-    fl.style.opacity = '0';
-    setTimeout(resetSession, 400);
-  }, 600);
+  const fl  = document.getElementById('white-flash');
+  const cvs = document.getElementById('cloud-noise-canvas');
+  if (!fl || !cvs) return;
+
+  cvs.width  = innerWidth;
+  cvs.height = innerHeight;
+  const ctx = cvs.getContext('2d');
+
+  // Large soft cloud blobs — drift very slowly
+  const blobs = Array.from({length: 9}, () => ({
+    x:  Math.random() * innerWidth,
+    y:  Math.random() * innerHeight,
+    r:  240 + Math.random() * 260,
+    vx: (Math.random() - 0.5) * 14,
+    vy: (Math.random() - 0.5) * 10,
+    a:  0.55 + Math.random() * 0.45,
+  }));
+
+  const FADE_IN  = 1800;   // ms — slow inhale
+  const HOLD     = 600;    // ms — breath held
+  const FADE_OUT = 2200;   // ms — slow exhale
+  const TOTAL    = FADE_IN + HOLD + FADE_OUT;
+  const t0 = Date.now();
+  let resetCalled = false;
+  let animId;
+
+  function cloudFrame() {
+    const t = Date.now() - t0;
+    const op = t < FADE_IN
+      ? t / FADE_IN
+      : t < FADE_IN + HOLD
+        ? 1
+        : Math.max(0, 1 - (t - FADE_IN - HOLD) / FADE_OUT);
+
+    fl.style.opacity = op;
+
+    // Trigger scene reset partway through fade-out (scene loads under the white)
+    if (!resetCalled && t > FADE_IN + HOLD + 400) {
+      resetCalled = true;
+      resetSession();
+    }
+
+    // Draw drifting blobs
+    const dt = 1 / 60;
+    ctx.clearRect(0, 0, cvs.width, cvs.height);
+    for (const b of blobs) {
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+      const g = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r);
+      g.addColorStop(0,   `rgba(255,255,255,${b.a})`);
+      g.addColorStop(0.5, `rgba(240,244,255,${b.a * 0.4})`);
+      g.addColorStop(1,   'rgba(255,255,255,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    if (t < TOTAL) {
+      animId = requestAnimationFrame(cloudFrame);
+    } else {
+      fl.style.opacity = 0;
+    }
+  }
+
+  requestAnimationFrame(cloudFrame);
 }
 
 function resetSession() {
