@@ -555,7 +555,7 @@ body {
 
 // ── Audio Engine ──────────────────────────────────────────────────────────────
 const _audio = (() => {
-  let ctx = null, master = null, reverb = null, dry = null, ambStarted = false;
+  let ctx = null, master = null, reverb = null, dry = null;
   const _tones = new Map(); // wave.id → { osc, lfo, g }
 
   // Pure harmonic series rooted at 528 Hz — natural ratios, crystalline
@@ -606,35 +606,6 @@ const _audio = (() => {
     reverb.connect(revG); revG.connect(master);
     dry.connect(master);
 
-    _startAmbient();
-  }
-
-  function _startAmbient() {
-    if (ambStarted || !ctx) return;
-    ambStarted = true;
-    const now = ctx.currentTime;
-
-    // Three barely-there drones — like background photon hiss
-    // Pure harmonics of 528: C5, G5, C6
-    const drones = [
-      [528,  0,   0.016],
-      [792,  1.2, 0.009],
-      [1056, -0.8, 0.005],
-    ];
-    drones.forEach(([freq, detune, peak], i) => {
-      const osc = ctx.createOscillator();
-      osc.type = 'sine'; osc.frequency.value = freq; osc.detune.value = detune;
-      const g = ctx.createGain();
-      // Ultra-slow breath: barely perceptible swell
-      const lfo = ctx.createOscillator(); lfo.type = 'sine';
-      lfo.frequency.value = 0.007 + i * 0.003;
-      const lfoG = ctx.createGain(); lfoG.gain.value = peak * 0.22;
-      lfo.connect(lfoG); lfoG.connect(g.gain);
-      g.gain.setValueAtTime(0, now);
-      g.gain.linearRampToValueAtTime(peak, now + 14 + i * 5);
-      osc.connect(g); g.connect(reverb); g.connect(dry);
-      osc.start(now); lfo.start(now);
-    });
   }
 
   // Each live attractor gets its own sustained light-tone
