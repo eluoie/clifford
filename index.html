@@ -1099,12 +1099,14 @@ class NameWave {
     // ── Chaos param animation (kicks in at ≤30s remaining) ───────────────────
     this._chaosBaseParams  = null;   // snapshot of params when chaos starts
     this._chaosT           = 0;      // elapsed time within chaos
-    this._chaosMorphTarget = null;   // current geometry target
-    this._chaosMorphNext   = 0;      // countdown to next regen
     // Each param oscillates at its own frequency + phase so patterns never repeat
-    this._chaosFreqs  = [0.20+Math.random()*0.22, 0.16+Math.random()*0.24, 0.12+Math.random()*0.16, 0.14+Math.random()*0.19];
+    this._chaosFreqs  = [0.18+Math.random()*0.14, 0.12+Math.random()*0.16, 0.09+Math.random()*0.12, 0.11+Math.random()*0.13];
     this._chaosPhases = Array.from({length:4}, () => Math.random() * Math.PI * 2);
-    this._chaosAmps   = [0.07, 0.06, 0.05, 0.05];
+    this._chaosAmps   = [0.06, 0.05, 0.04, 0.04];
+    // Rolling-buffer state (live trajectory, no lerp)
+    this._chaosX = 0; this._chaosY = 0;
+    this._chaosWriteIdx = 0;
+    this._chaosCx = 0; this._chaosCy = 0; this._chaosScale = 1;
 
     // ── Keplerian orbit ───────────────────────────────────────────────────────
     this._orbTheta = this._orbPhase;
@@ -1258,37 +1260,48 @@ class NameWave {
 
       const _inChaos = sessionPhase === 'chaos' || sessionPhase === 'result';
       if (_inChaos) {
-        // ── Chaos: sine-wave param oscillation — shapes morph organically ──────
+        // ── Chaos: rolling-buffer live attractor — always a real Clifford shape ─
         if (!this._chaosBaseParams) {
+          // Snapshot base params and compute scale/centering from them
           this._chaosBaseParams = { ...this.params };
-          this._chaosT = 0; this._chaosMorphNext = 0;
+          this._chaosT = 0;
+          const bp = this.params;
+          let bx=0.1, by=0.1;
+          for (let i=0;i<500;i++){const nx=Math.sin(bp.a*by)+bp.c*Math.cos(bp.a*bx),ny=Math.sin(bp.b*bx)+bp.d*Math.cos(bp.b*by);bx=isFinite(nx)?nx:0.1;by=isFinite(ny)?ny:0.1;}
+          let mnX=bx,mxX=bx,mnY=by,mxY=by,sx=bx,sy=by;
+          for (let i=0;i<4000;i++){const nx=Math.sin(bp.a*sy)+bp.c*Math.cos(bp.a*sx),ny=Math.sin(bp.b*sx)+bp.d*Math.cos(bp.b*sy);sx=isFinite(nx)?nx:0.1;sy=isFinite(ny)?ny:0.1;if(sx<mnX)mnX=sx;if(sx>mxX)mxX=sx;if(sy<mnY)mnY=sy;if(sy>mxY)mxY=sy;}
+          this._chaosCx=(mnX+mxX)/2; this._chaosCy=(mnY+mxY)/2;
+          this._chaosScale=(CLOUD_RADIUS*2)/(Math.max(mxX-mnX,mxY-mnY)||1);
+          this._chaosX=bx; this._chaosY=by; this._chaosWriteIdx=0;
         }
         this._chaosT += dt;
-        this._chaosMorphNext -= dt;
-        if (this._chaosMorphNext <= 0) {
-          this._chaosMorphNext = 1.2;
-          const ap = {
-            a: this._chaosBaseParams.a + Math.sin(this._chaosT * this._chaosFreqs[0] + this._chaosPhases[0]) * this._chaosAmps[0],
-            b: this._chaosBaseParams.b + Math.sin(this._chaosT * this._chaosFreqs[1] + this._chaosPhases[1]) * this._chaosAmps[1],
-            c: this._chaosBaseParams.c + Math.sin(this._chaosT * this._chaosFreqs[2] + this._chaosPhases[2]) * this._chaosAmps[2],
-            d: this._chaosBaseParams.d + Math.sin(this._chaosT * this._chaosFreqs[3] + this._chaosPhases[3]) * this._chaosAmps[3],
-          };
-          if (!isDegenerate(ap.a, ap.b, ap.c, ap.d)) {
-            this._chaosMorphTarget = generateClifford3D(ap, MAX_PTS);
-          }
+        // Current oscillated params — small amplitude keeps shape recognizable
+        const ap = {
+          a: this._chaosBaseParams.a + Math.sin(this._chaosT * this._chaosFreqs[0] + this._chaosPhases[0]) * this._chaosAmps[0],
+          b: this._chaosBaseParams.b + Math.sin(this._chaosT * this._chaosFreqs[1] + this._chaosPhases[1]) * this._chaosAmps[1],
+          c: this._chaosBaseParams.c + Math.sin(this._chaosT * this._chaosFreqs[2] + this._chaosPhases[2]) * this._chaosAmps[2],
+          d: this._chaosBaseParams.d + Math.sin(this._chaosT * this._chaosFreqs[3] + this._chaosPhases[3]) * this._chaosAmps[3],
+        };
+        // Write 700 trajectory steps per frame into rolling buffer (full refresh ~1.7s at 60fps)
+        const STEPS = 700;
+        const pos  = this.cloud.geometry.attributes.position.array;
+        const pos2 = this.cloud2.geometry.attributes.position.array;
+        const N = MAX_PTS;
+        const cx = this._chaosCx, cy = this._chaosCy, sc = this._chaosScale;
+        let x = this._chaosX, y = this._chaosY;
+        for (let i = 0; i < STEPS; i++) {
+          const nx = Math.sin(ap.a*y)+ap.c*Math.cos(ap.a*x);
+          const ny = Math.sin(ap.b*x)+ap.d*Math.cos(ap.b*y);
+          x = isFinite(nx)?nx:x; y = isFinite(ny)?ny:y;
+          const wi = (this._chaosWriteIdx + i) % N;
+          const px=(x-cx)*sc, py=(y-cy)*sc, pz=Math.sin(x*y)*0.35;
+          pos[wi*3]=px;  pos[wi*3+1]=py;  pos[wi*3+2]=pz;
+          pos2[wi*3]=px; pos2[wi*3+1]=py; pos2[wi*3+2]=pz;
         }
-        if (this._chaosMorphTarget) {
-          const lr = Math.min(1, dt * 0.5);
-          const pos  = this.cloud.geometry.attributes.position.array;
-          const pos2 = this.cloud2.geometry.attributes.position.array;
-          const tgt  = this._chaosMorphTarget;
-          for (let k = 0; k < pos.length; k++) {
-            pos[k]  += (tgt[k] - pos[k])  * lr;
-            pos2[k] += (tgt[k] - pos2[k]) * lr;
-          }
-          this.cloud.geometry.attributes.position.needsUpdate  = true;
-          this.cloud2.geometry.attributes.position.needsUpdate = true;
-        }
+        this._chaosX = x; this._chaosY = y;
+        this._chaosWriteIdx = (this._chaosWriteIdx + STEPS) % N;
+        this.cloud.geometry.attributes.position.needsUpdate  = true;
+        this.cloud2.geometry.attributes.position.needsUpdate = true;
       } else {
         // ── Normal: tiny random walk every few seconds ────────────────────────
         this._chaosBaseParams = null; // reset so chaos re-initialises fresh next time
