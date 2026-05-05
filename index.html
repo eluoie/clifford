@@ -191,7 +191,7 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
   top: 32px;
   right: 36px;
   z-index: 20;
-  max-width: 380px;
+  width: 340px;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.9s ease;
@@ -262,7 +262,7 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
 
 
 <!-- ── Info overlay boxes ────────────────────────────────────────────────── -->
-<div id="info-box"><p id="info-text"><span class="info-cursor"></span></p></div>
+<div id="info-box"><p id="info-text"></p></div>
 
 <!-- ── Decision overlay ──────────────────────────────────────────────────── -->
 <div id="decision-overlay"><span id="decision-word"></span></div>
@@ -2254,18 +2254,21 @@ let _infoTransitioning = false;
 let _infoFadeOutTimer = null;
 
 function _infoStartTyping(box, txt, text) {
-  // Wait for fade-in transition (0.9s) to finish before typing begins
+  // Wait for fade-in (0.9s) to finish before typing begins
   setTimeout(() => {
-    let i = 0;
+    txt.textContent = '';
+    // Single text node updated in-place — avoids creating one node per character,
+    // which causes browsers to batch-flush the first row all at once
+    const tn = document.createTextNode('');
     const cursor = document.createElement('span');
     cursor.className = 'info-cursor';
-    txt.textContent = '';
+    txt.appendChild(tn);
     txt.appendChild(cursor);
+    let i = 0;
     const iv = setInterval(() => {
-      cursor.insertAdjacentText('beforebegin', text[i++]);
+      tn.nodeValue = text.slice(0, ++i);
       if (i >= text.length) {
         clearInterval(iv);
-        // Fade out 10 s after typing finishes
         _infoFadeOutTimer = setTimeout(() => {
           box.classList.remove('info-visible');
           _infoFadeOutTimer = null;
