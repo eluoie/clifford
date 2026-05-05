@@ -179,11 +179,65 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
 }
 #decision-overlay.visible { opacity: 1; }
 #decision-word {
-  font-size: 18vw; font-weight: 100; letter-spacing: 0.12em;
+  font-size: 18vw; font-weight: 200; letter-spacing: 0.38em;
   text-transform: uppercase; font-family: monospace;
   line-height: 1; text-align: center;
+  color: rgba(255,255,255,0.92);
+  text-shadow: 0 0 80px rgba(255,255,255,0.25);
 }
 
+
+/* ── Vote progress popup (bottom-left) ───────────────────────────────────── */
+#vote-popup {
+  position: fixed;
+  bottom: 36px;
+  left: 36px;
+  z-index: 20;
+  width: 200px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.8s ease;
+}
+#vote-popup.vote-visible { opacity: 1; }
+.vp-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.vp-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.vp-label {
+  font-family: monospace;
+  font-size: 8px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.35);
+}
+.vp-track {
+  width: 100%;
+  height: 2px;
+  background: rgba(255,255,255,0.07);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.vp-bar {
+  height: 100%;
+  border-radius: 2px;
+  width: 0%;
+  transition: width 0.9s cubic-bezier(0.4,0,0.2,1);
+}
+#vp-bar-die  { background: rgba(255,255,255,0.72); }
+#vp-bar-live { background: rgba(255,255,255,0.72); }
+.vp-count {
+  font-family: monospace;
+  font-size: 8px;
+  letter-spacing: 0.18em;
+  color: rgba(255,255,255,0.22);
+  text-align: right;
+}
 
 /* ── Info overlay boxes ───────────────────────────────────────────────────── */
 #info-box {
@@ -260,6 +314,22 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
   <div class="t-value" id="timer-value-el">0:30</div>
 </div>
 
+
+<!-- ── Vote progress popup ───────────────────────────────────────────────── -->
+<div id="vote-popup">
+  <div class="vp-row">
+    <div class="vp-item">
+      <div class="vp-label">PURGE</div>
+      <div class="vp-track"><div class="vp-bar" id="vp-bar-die"></div></div>
+      <div class="vp-count" id="vp-count-die">0</div>
+    </div>
+    <div class="vp-item">
+      <div class="vp-label">MERGE</div>
+      <div class="vp-track"><div class="vp-bar" id="vp-bar-live"></div></div>
+      <div class="vp-count" id="vp-count-live">0</div>
+    </div>
+  </div>
+</div>
 
 <!-- ── Info overlay boxes ────────────────────────────────────────────────── -->
 <div id="info-box"><p id="info-text"></p></div>
@@ -349,23 +419,6 @@ body {
 #ip-send-btn:hover:not(:disabled) { opacity:0.9; }
 #ip-send-btn:active:not(:disabled) { opacity:0.8; }
 #ip-send-btn:disabled { opacity:0.25; cursor:default; }
-/* After vote */
-#ip-voted { display:none; flex-direction:column; align-items:center; gap:36px; width:100%; padding-top:8px; }
-.iv-timer-section { display:flex; flex-direction:column; align-items:center; gap:8px; }
-.iv-timer-label { font-size:8px; letter-spacing:0.5em; text-transform:uppercase; color:rgba(255,255,255,0.2); font-family:monospace; }
-.iv-timer-val { font-size:88px; font-weight:100; letter-spacing:0.05em; font-family:monospace; color:#fff; line-height:1; }
-.iv-chart { display:flex; gap:12px; width:100%; height:260px; }
-.iv-col { flex:1; display:flex; flex-direction:column; align-items:center; gap:10px; }
-.iv-pct { font-size:13px; font-weight:200; font-family:monospace; letter-spacing:0.08em; color:rgba(255,255,255,0.5); height:18px; }
-.iv-bar-wrap { width:100%; flex:1; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:10px; overflow:hidden; display:flex; flex-direction:column; justify-content:flex-end; }
-.iv-bar { width:100%; transition:height 0.7s cubic-bezier(0.4,0,0.2,1); border-radius:10px; }
-.iv-bar-die  { background:linear-gradient(to top, rgba(160,40,255,0.95), rgba(80,0,180,0.4)); box-shadow:0 0 24px rgba(160,40,255,0.35); }
-.iv-bar-live { background:linear-gradient(to top, rgba(0,210,255,0.9), rgba(0,80,180,0.35)); box-shadow:0 0 24px rgba(0,210,255,0.3); }
-.iv-col-label { font-size:8px; letter-spacing:0.4em; text-transform:uppercase; font-family:monospace; text-align:center; line-height:1.5; }
-.iv-col-label-die  { color:rgba(180,80,255,0.75); }
-.iv-col-label-live { color:rgba(0,210,255,0.7); }
-.iv-col-count { font-size:26px; font-weight:200; font-family:monospace; color:rgba(255,255,255,0.6); }
-.ip-lockout { font-size:9px; letter-spacing:0.35em; text-transform:uppercase; color:rgba(255,90,90,0.5); text-align:center; font-family:monospace; }
 </style>
 <div id="ip-wrap">
   <div id="ip-entry">
@@ -383,45 +436,22 @@ body {
         <div class="ip-radio"><div class="ip-radio-dot"></div></div>
         <div class="ip-choice-texts">
           <span class="ip-choice-title">PURGE</span>
-          <span class="ip-choice-sub">Autonomy through erasure.</span>
+          <span class="ip-choice-sub">All creations remains their unique identity and will explode by the end of the session.</span>
         </div>
       </div>
       <div class="ip-choice" data-val="live">
         <div class="ip-radio"><div class="ip-radio-dot"></div></div>
         <div class="ip-choice-texts">
           <span class="ip-choice-title">MERGE</span>
-          <span class="ip-choice-sub">Eternity through fusion.</span>
+          <span class="ip-choice-sub">All creations will be unified and survive every session reset.</span>
         </div>
       </div>
     </div>
     <button id="ip-send-btn" disabled>SEND</button>
   </div>
-  <div id="ip-voted">
-    <div class="iv-timer-section">
-      <div class="iv-timer-label">session resets in</div>
-      <div id="ip-t1" class="iv-timer-val">—</div>
-      <div style="font-size:11px;font-weight:300;color:rgba(255,255,255,0.35);text-align:center;line-height:1.6;max-width:280px;padding-top:4px;">The collective decision about this session's fate will be announced shortly.</div>
-    </div>
-    <div class="iv-chart">
-      <div class="iv-col">
-        <div class="iv-pct" id="iv-die-pct"></div>
-        <div class="iv-bar-wrap"><div class="iv-bar iv-bar-die" id="iv-bar-die" style="height:0%"></div></div>
-        <div class="iv-col-label iv-col-label-die" style="visibility:hidden">PURGE</div>
-        <div class="iv-col-count" id="iv-die-count">0</div>
-      </div>
-      <div class="iv-col">
-        <div class="iv-pct" id="iv-live-pct"></div>
-        <div class="iv-bar-wrap"><div class="iv-bar iv-bar-live" id="iv-bar-live" style="height:0%"></div></div>
-        <div class="iv-col-label iv-col-label-live" style="visibility:hidden">MERGE</div>
-        <div class="iv-col-count" id="iv-live-count">0</div>
-      </div>
-    </div>
-    <div id="ip-lockout-msg"></div>
-  </div>
 </div>`;
 
   let selectedVote = null;
-  let lastKnownDie = 0, lastKnownLive = 0;
   function fmtT(s) { s=Math.max(0,Math.ceil(s)); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
 
   function checkReady() {
@@ -447,22 +477,6 @@ body {
       phoneMqtt.publish('clifford/'+topic, word);
       phoneMqtt.publish('clifford/'+topic+'/vote', JSON.stringify({voterId, choice:selectedVote}));
     }
-    // Pre-populate chart with user's vote already counted so bars don't jump on first MQTT update
-    const _preD = lastKnownDie  + (selectedVote === 'die'  ? 1 : 0);
-    const _preL = lastKnownLive + (selectedVote === 'live' ? 1 : 0);
-    const _preT = _preD + _preL || 1;
-    const _preDp = Math.round(_preD / _preT * 100), _preLp = Math.round(_preL / _preT * 100);
-    const _bd = document.getElementById('iv-bar-die'),   _bl = document.getElementById('iv-bar-live');
-    const _pd = document.getElementById('iv-die-pct'),   _pl = document.getElementById('iv-live-pct');
-    const _cd = document.getElementById('iv-die-count'), _cl = document.getElementById('iv-live-count');
-    if(_bd) _bd.style.height = _preDp + '%';
-    if(_bl) _bl.style.height = _preLp + '%';
-    if(_pd) _pd.textContent = _preDp + '%';
-    if(_pl) _pl.textContent = _preLp + '%';
-    if(_cd) _cd.textContent = _preD;
-    if(_cl) _cl.textContent = _preL;
-    document.getElementById('ip-entry').style.display = 'none';
-    document.getElementById('ip-voted').style.display = 'flex';
   });
 
   // MQTT for state updates
@@ -474,29 +488,11 @@ body {
       try {
         const st = JSON.parse(buf.toString());
         const fmt = fmtT(st.timer||0);
-        const ti=document.getElementById('ip-timer-inline'), t1=document.getElementById('ip-t1');
-        if(ti) ti.textContent=fmt; if(t1) t1.textContent=fmt;
-        if(st.die!==undefined) {
-          const die=st.die||0, live=st.live||0;
-          lastKnownDie = die; lastKnownLive = live;
-          const tot=die+live||1;
-          const diePct=Math.round(die/tot*100), livePct=Math.round(live/tot*100);
-          const hasVotes = die+live > 0;
-          const bd=document.getElementById('iv-bar-die'),   bl=document.getElementById('iv-bar-live');
-          const pd=document.getElementById('iv-die-pct'),   pl=document.getElementById('iv-live-pct');
-          const cd=document.getElementById('iv-die-count'), cl=document.getElementById('iv-live-count');
-          if(bd) bd.style.height=diePct+'%';
-          if(bl) bl.style.height=livePct+'%';
-          if(pd) pd.textContent=hasVotes?diePct+'%':'';
-          if(pl) pl.textContent=hasVotes?livePct+'%':'';
-          if(cd) cd.textContent=die;
-          if(cl) cl.textContent=live;
-        }
+        const ti=document.getElementById('ip-timer-inline');
+        if(ti) ti.textContent=fmt;
         if(st.phase==='lockout'||st.phase==='chaos'||st.phase==='result') {
           const f=document.getElementById('ip-field'), b=document.getElementById('ip-send-btn');
           if(f) f.disabled=true; if(b) b.disabled=true;
-          const lk=document.getElementById('ip-lockout-msg');
-          if(lk){lk.className='ip-lockout';lk.textContent='session is ending';}
         }
       } catch(_) {}
     });
@@ -1093,9 +1089,19 @@ class NameWave {
     this._breathPhase  = Math.random() * Math.PI * 2;
     this._breathPeriod = 18 + Math.random() * 28;
 
-    // ── Clifford morphing ─────────────────────────────────────────────────────
+    // ── Clifford morphing (normal) ────────────────────────────────────────────
     this._morphClock    = Math.random() * 7;
     this._morphInterval = 4 + Math.random() * 6;
+
+    // ── Chaos param animation (kicks in at ≤30s remaining) ───────────────────
+    this._chaosBaseParams  = null;   // snapshot of params when chaos starts
+    this._chaosT           = 0;      // elapsed time within chaos
+    this._chaosMorphTarget = null;   // current geometry target
+    this._chaosMorphNext   = 0;      // countdown to next regen
+    // Each param oscillates at its own frequency + phase so patterns never repeat
+    this._chaosFreqs  = [0.20+Math.random()*0.22, 0.16+Math.random()*0.24, 0.12+Math.random()*0.16, 0.14+Math.random()*0.19];
+    this._chaosPhases = Array.from({length:4}, () => Math.random() * Math.PI * 2);
+    this._chaosAmps   = [0.24, 0.22, 0.17, 0.16];
 
     // ── Keplerian orbit ───────────────────────────────────────────────────────
     this._orbTheta = this._orbPhase;
@@ -1247,25 +1253,61 @@ class NameWave {
       const breathAmt = Math.sin(this.age * (Math.PI * 2 / this._breathPeriod) + this._breathPhase);
       this.group.scale.setScalar(1 + 0.055 * breathAmt);
 
-      // Clifford morphing
-      this._morphClock += dt;
-      if (this._morphClock >= this._morphInterval) {
-        this._morphClock = 0;
-        const d = 0.005;
-        const np = {
-          a: this.params.a + (Math.random() - 0.5) * d,
-          b: this.params.b + (Math.random() - 0.5) * d,
-          c: this.params.c + (Math.random() - 0.5) * d * 0.65,
-          d: this.params.d + (Math.random() - 0.5) * d * 0.65,
-        };
-        if (!isDegenerate(np.a, np.b, np.c, np.d)) {
-          this.params.a = np.a; this.params.b = np.b;
-          this.params.c = np.c; this.params.d = np.d;
-          const newPts = generateClifford3D(this.params, MAX_PTS);
-          this.cloud.geometry.attributes.position.array.set(newPts.slice());
-          this.cloud.geometry.attributes.position.needsUpdate = true;
-          this.cloud2.geometry.attributes.position.array.set(newPts);
+      const _inChaos = sessionPhase === 'chaos' || sessionPhase === 'result';
+      if (_inChaos) {
+        // ── Chaos: sine-wave param oscillation — shapes morph organically ──────
+        if (!this._chaosBaseParams) {
+          this._chaosBaseParams = { ...this.params };
+          this._chaosT = 0; this._chaosMorphNext = 0;
+        }
+        this._chaosT += dt;
+        this._chaosMorphNext -= dt;
+        if (this._chaosMorphNext <= 0) {
+          this._chaosMorphNext = 0.45;
+          const ap = {
+            a: this._chaosBaseParams.a + Math.sin(this._chaosT * this._chaosFreqs[0] + this._chaosPhases[0]) * this._chaosAmps[0],
+            b: this._chaosBaseParams.b + Math.sin(this._chaosT * this._chaosFreqs[1] + this._chaosPhases[1]) * this._chaosAmps[1],
+            c: this._chaosBaseParams.c + Math.sin(this._chaosT * this._chaosFreqs[2] + this._chaosPhases[2]) * this._chaosAmps[2],
+            d: this._chaosBaseParams.d + Math.sin(this._chaosT * this._chaosFreqs[3] + this._chaosPhases[3]) * this._chaosAmps[3],
+          };
+          if (!isDegenerate(ap.a, ap.b, ap.c, ap.d)) {
+            this._chaosMorphTarget = generateClifford3D(ap, MAX_PTS);
+          }
+        }
+        if (this._chaosMorphTarget) {
+          const lr = Math.min(1, dt * 1.4);
+          const pos  = this.cloud.geometry.attributes.position.array;
+          const pos2 = this.cloud2.geometry.attributes.position.array;
+          const tgt  = this._chaosMorphTarget;
+          for (let k = 0; k < pos.length; k++) {
+            pos[k]  += (tgt[k] - pos[k])  * lr;
+            pos2[k] += (tgt[k] - pos2[k]) * lr;
+          }
+          this.cloud.geometry.attributes.position.needsUpdate  = true;
           this.cloud2.geometry.attributes.position.needsUpdate = true;
+        }
+      } else {
+        // ── Normal: tiny random walk every few seconds ────────────────────────
+        this._chaosBaseParams = null; // reset so chaos re-initialises fresh next time
+        this._morphClock += dt;
+        if (this._morphClock >= this._morphInterval) {
+          this._morphClock = 0;
+          const d = 0.005;
+          const np = {
+            a: this.params.a + (Math.random() - 0.5) * d,
+            b: this.params.b + (Math.random() - 0.5) * d,
+            c: this.params.c + (Math.random() - 0.5) * d * 0.65,
+            d: this.params.d + (Math.random() - 0.5) * d * 0.65,
+          };
+          if (!isDegenerate(np.a, np.b, np.c, np.d)) {
+            this.params.a = np.a; this.params.b = np.b;
+            this.params.c = np.c; this.params.d = np.d;
+            const newPts = generateClifford3D(this.params, MAX_PTS);
+            this.cloud.geometry.attributes.position.array.set(newPts.slice());
+            this.cloud.geometry.attributes.position.needsUpdate = true;
+            this.cloud2.geometry.attributes.position.array.set(newPts);
+            this.cloud2.geometry.attributes.position.needsUpdate = true;
+          }
         }
       }
     }
@@ -1413,6 +1455,49 @@ class ClashBurst {
     }
     this.posAttr.needsUpdate = true;
     this.mat.opacity = p < 0.12 ? p/0.12 : Math.pow(1-(p-0.12)/0.88, 1.4);
+    return true;
+  }
+  destroy() { scene.remove(this.points); }
+}
+
+class MergeBurst {
+  constructor(pos, color) {
+    this.age = 0; this.maxAge = 2.2;
+    const N = 220, arr = new Float32Array(N * 3);
+    this.vels = new Float32Array(N * 3);
+    for (let i = 0; i < N; i++) {
+      arr[i*3]   = pos.x + (Math.random()-0.5)*0.15;
+      arr[i*3+1] = pos.y + (Math.random()-0.5)*0.15;
+      arr[i*3+2] = pos.z + (Math.random()-0.5)*0.15;
+      const phi = Math.acos(2*Math.random()-1), theta = Math.random()*Math.PI*2;
+      const spd = 1.0 + Math.random()*6.0;
+      this.vels[i*3]   = Math.sin(phi)*Math.cos(theta)*spd;
+      this.vels[i*3+1] = Math.sin(phi)*Math.sin(theta)*spd;
+      this.vels[i*3+2] = Math.cos(phi)*spd;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+    this.posAttr = geo.attributes.position;
+    this.mat = new THREE.PointsMaterial({
+      color, size: 0.16, sizeAttenuation: true,
+      opacity: 0, ...ADDITIVE
+    });
+    this.points = new THREE.Points(geo, this.mat);
+    scene.add(this.points);
+  }
+  update(dt) {
+    this.age += dt;
+    if (this.age >= this.maxAge) { scene.remove(this.points); return false; }
+    const p = this.age / this.maxAge;
+    const arr = this.posAttr.array;
+    for (let i = 0; i < arr.length/3; i++) {
+      arr[i*3]   += this.vels[i*3]   * dt;
+      arr[i*3+1] += this.vels[i*3+1] * dt;
+      arr[i*3+2] += this.vels[i*3+2] * dt;
+      this.vels[i*3]   *= 0.93; this.vels[i*3+1] *= 0.93; this.vels[i*3+2] *= 0.93;
+    }
+    this.posAttr.needsUpdate = true;
+    this.mat.opacity = p < 0.08 ? p/0.08 : Math.pow(1-(p-0.08)/0.92, 1.4);
     return true;
   }
   destroy() { scene.remove(this.points); }
@@ -1695,14 +1780,10 @@ function updateSessionTimerEl(remaining) {
 }
 
 function showDecisionOverlay() {
-  const word  = votesDie >= votesLive ? 'PURGE' : 'MERGE';
-  const color = votesDie >= votesLive ? 'rgba(180,40,255,0.92)' : 'rgba(0,210,255,0.92)';
   const ov = document.getElementById('decision-overlay');
   const dw = document.getElementById('decision-word');
   if (!ov || !dw) return;
-  dw.textContent  = word;
-  dw.style.color  = color;
-  dw.style.textShadow = `0 0 120px ${color}, 0 0 240px ${color}`;
+  dw.textContent = votesDie >= votesLive ? 'PURGE' : 'MERGE';
   ov.classList.add('visible');
   setTimeout(() => { ov.classList.remove('visible'); }, 5000);
 }
@@ -1923,55 +2004,61 @@ async function purgeBurst(wave, wordEl) {
 }
 
 // LIVE AS ALL — organic merge / rebirth
+// Find chaotic merged params: tries simple average, then biased blends, then perturbed fallback.
+function findMergedParams(waves) {
+  const wn = waves.length;
+  const avg = { a:0, b:0, c:0, d:0 };
+  waves.forEach(w => { avg.a+=w.params.a; avg.b+=w.params.b; avg.c+=w.params.c; avg.d+=w.params.d; });
+  avg.a/=wn; avg.b/=wn; avg.c/=wn; avg.d/=wn;
+  if (!isDegenerate(avg.a, avg.b, avg.c, avg.d)) return avg;
+
+  // Try biased blends between wave pairs
+  const ps = waves.map(w => w.params);
+  for (const t of [0.35, 0.65, 0.25, 0.75, 0.5]) {
+    for (let i = 0; i < ps.length - 1; i++) {
+      const p0 = ps[i], p1 = ps[i + 1];
+      const p = { a: p0.a*(1-t)+p1.a*t, b: p0.b*(1-t)+p1.b*t, c: p0.c*(1-t)+p1.c*t, d: p0.d*(1-t)+p1.d*t };
+      if (!isDegenerate(p.a, p.b, p.c, p.d)) return p;
+    }
+  }
+
+  // Small perturbation of avg toward first wave until chaotic
+  const p0 = ps[0];
+  for (const w of [0.15, 0.3, 0.5, 0.7, 0.9]) {
+    const p = { a: avg.a*(1-w)+p0.a*w, b: avg.b*(1-w)+p0.b*w, c: avg.c*(1-w)+p0.c*w, d: avg.d*(1-w)+p0.d*w };
+    if (!isDegenerate(p.a, p.b, p.c, p.d)) return p;
+  }
+
+  // Absolute fallback: first wave's params (guaranteed chaotic)
+  return { ...ps[0] };
+}
+
 async function runLiveAsAll() {
   const waves = nameWaves.filter(w => !w.dead);
   if (!waves.length) return;
 
   // ── Merged params + blended color ─────────────────────────────────────────
-  const avg = { a:0, b:0, c:0, d:0 };
-  waves.forEach(w => { avg.a+=w.params.a; avg.b+=w.params.b; avg.c+=w.params.c; avg.d+=w.params.d; });
   const wn = waves.length;
-  avg.a/=wn; avg.b/=wn; avg.c/=wn; avg.d/=wn;
+  const avg = findMergedParams(waves);
   localStorage.setItem('clf-survivor', JSON.stringify({ params: avg, name: 'COLLECTIVE' }));
 
   const blendColor = new THREE.Color(0,0,0);
   waves.forEach(w => blendColor.add(w.sig.color.clone().multiplyScalar(1/wn)));
 
-  const mergedPts = generateClifford3D(avg, MAX_PTS);
-  const origPts   = waves.map(w => new Float32Array(w.cloud.geometry.attributes.position.array));
+  const mergedPts  = generateClifford3D(avg, MAX_PTS);
+  const origPts    = waves.map(w => new Float32Array(w.cloud.geometry.attributes.position.array));
+  const origPts2   = waves.map(w => new Float32Array(w.cloud2.geometry.attributes.position.array));
 
-  // ── Build 2D canvas now (CPU work — done before animation starts) ──────────
+  // ── Canvas — rendered after the rebirth flash using mergedPts ────────────
   const DPR    = Math.min(devicePixelRatio, 2);
   const SZ_css = Math.round(Math.min(innerWidth, innerHeight) * 0.64);
-  const SZ     = SZ_css * DPR;
   const cvs = document.createElement('canvas');
-  cvs.width = SZ; cvs.height = SZ;
+  cvs.width = SZ_css * DPR; cvs.height = SZ_css * DPR;
   cvs.style.width = SZ_css + 'px'; cvs.style.height = SZ_css + 'px';
-  const c2 = cvs.getContext('2d');
-  let mnX=Infinity,mxX=-Infinity,mnY=Infinity,mxY=-Infinity;
-  for (let k=0; k<mergedPts.length; k+=3) {
-    if (mergedPts[k]   < mnX) mnX=mergedPts[k];   if (mergedPts[k]   > mxX) mxX=mergedPts[k];
-    if (mergedPts[k+1] < mnY) mnY=mergedPts[k+1]; if (mergedPts[k+1] > mxY) mxY=mergedPts[k+1];
-  }
-  const pad2 = 36 * DPR;
-  const sc2 = Math.min((SZ-pad2*2)/(mxX-mnX), (SZ-pad2*2)/(mxY-mnY));
-  const cr=Math.round(blendColor.r*255), cg=Math.round(blendColor.g*255), cb2=Math.round(blendColor.b*255);
-  // Black base
-  c2.fillStyle = '#000'; c2.fillRect(0,0,SZ,SZ);
-  // Additive blending — dense regions accumulate brightness, exactly like the 3D scene
-  c2.globalCompositeOperation = 'lighter';
-  // Wide glow pass
-  c2.fillStyle = `rgba(${cr},${cg},${cb2},0.018)`;
-  for (let k=0; k<mergedPts.length; k+=3) {
-    const px=(mergedPts[k]-mnX)*sc2+pad2, py=SZ-((mergedPts[k+1]-mnY)*sc2+pad2);
-    c2.fillRect(px-2,py-2,5*DPR,5*DPR);
-  }
-  // Tight core pass
-  c2.fillStyle = `rgba(${cr},${cg},${cb2},0.09)`;
-  for (let k=0; k<mergedPts.length; k+=3) {
-    const px=(mergedPts[k]-mnX)*sc2+pad2, py=SZ-((mergedPts[k+1]-mnY)*sc2+pad2);
-    c2.fillRect(px,py,1.8*DPR,1.8*DPR);
-  }
+  // Bright version of blendColor so the attractor is clearly visible
+  const hsl2d = {}; blendColor.getHSL(hsl2d);
+  const brightC = new THREE.Color().setHSL(hsl2d.h, 0.95, 0.70);
+  const cr=Math.round(brightC.r*255), cg=Math.round(brightC.g*255), cb2=Math.round(brightC.b*255);
 
   // ── Create merged wave (hidden) ────────────────────────────────────────────
   const merged = new NameWave('COLLECTIVE', nameIdCnt++, true);
@@ -2059,6 +2146,10 @@ async function runLiveAsAll() {
       const orig = origPts[i];
       for (let k=0; k<pos.length; k++) pos[k] = orig[k] + (mergedPts[k]-orig[k]) * morphT;
       w.cloud.geometry.attributes.position.needsUpdate = true;
+      const pos2 = w.cloud2.geometry.attributes.position.array;
+      const orig2 = origPts2[i];
+      for (let k=0; k<pos2.length; k++) pos2[k] = orig2[k] + (mergedPts[k]-orig2[k]) * morphT;
+      w.cloud2.geometry.attributes.position.needsUpdate = true;
       // Brighten toward peak — supernova before death
       w.mat.opacity  = Math.min(1.2, 1.0 + easeIn * 0.2);
       w.mat2.opacity = Math.min(0.85, 0.65 + easeIn * 0.2);
@@ -2066,6 +2157,7 @@ async function runLiveAsAll() {
   });
 
   // ── Phase 4 (10.5–12.5 s): extinction — rapid collapse + death ───────────
+  waves.forEach(w => { if (!w.dead) clashBursts.push(new MergeBurst(w.center.clone(), w.sig.color.clone())); });
   const preM = waves.map(w => w.center.clone());
   await phase(2000)(p => {
     sessionChaosSpeed = 22 + p * 12;
@@ -2093,6 +2185,42 @@ async function runLiveAsAll() {
     setTimeout(() => { fl.style.transition = 'opacity 2.2s ease'; fl.style.opacity = '0'; }, 140);
   }
   liveAsAllShake = 1.8;
+
+  // Render the 2D attractor canvas from mergedPts (already computed, fast)
+  {
+    const CW = cvs.width, CH = cvs.height;
+    const ctx2d = cvs.getContext('2d');
+    ctx2d.fillStyle = '#000';
+    ctx2d.fillRect(0, 0, CW, CH);
+
+    // Bounding box from mergedPts (x,y — ignore z)
+    let mnX=Infinity, mxX=-Infinity, mnY=Infinity, mxY=-Infinity;
+    for (let k=0; k<mergedPts.length; k+=3) {
+      if (mergedPts[k]<mnX) mnX=mergedPts[k]; if (mergedPts[k]>mxX) mxX=mergedPts[k];
+      if (mergedPts[k+1]<mnY) mnY=mergedPts[k+1]; if (mergedPts[k+1]>mxY) mxY=mergedPts[k+1];
+    }
+    const pad2d = 44 * DPR;
+    const sc2d = Math.min((CW-pad2d*2)/(mxX-mnX||1), (CH-pad2d*2)/(mxY-mnY||1));
+    const offX = (CW - (mxX-mnX)*sc2d)/2 - mnX*sc2d;
+    const offY = (CH - (mxY-mnY)*sc2d)/2 + mxY*sc2d;
+
+    ctx2d.globalCompositeOperation = 'screen';
+    // Glow pass: soft 5×5 blobs
+    ctx2d.fillStyle = `rgba(${cr},${cg},${cb2},0.12)`;
+    for (let k=0; k<mergedPts.length; k+=3) {
+      const px = (mergedPts[k]*sc2d + offX)|0;
+      const py = (offY - mergedPts[k+1]*sc2d)|0;
+      if (px>2&&px<CW-2&&py>2&&py<CH-2) ctx2d.fillRect(px-2, py-2, 5, 5);
+    }
+    // Core pass: tight 2×2 pixels
+    ctx2d.fillStyle = `rgba(${cr},${cg},${cb2},0.55)`;
+    for (let k=0; k<mergedPts.length; k+=3) {
+      const px = (mergedPts[k]*sc2d + offX)|0;
+      const py = (offY - mergedPts[k+1]*sc2d)|0;
+      if (px>=0&&px<CW-1&&py>=0&&py<CH-1) ctx2d.fillRect(px, py, 2, 2);
+    }
+    ctx2d.globalCompositeOperation = 'source-over';
+  }
 
   // ── Phase 5 (12.5–16 s): new attractor emerges from silence ──────────────
   // drawRange 0 → MAX_PTS with breathing pulse; 2D overlay begins fading in now
@@ -2161,6 +2289,8 @@ function resetSession() {
   votesDie = 0; votesLive = 0; votedIds.clear();
   sessionChaosSpeed = 1; liveAsAllShake = 0; resultExecuted = false; broadcastAccum = 0;
   _infoIdx = 0; _infoTransitioning = false;
+  _vpVisible = false; _vpNextChange = 8 + Math.random() * 18;
+  const _vpEl = document.getElementById('vote-popup'); if (_vpEl) _vpEl.classList.remove('vote-visible');
   if (_infoFadeOutTimer) { clearTimeout(_infoFadeOutTimer); _infoFadeOutTimer = null; }
   const _ib = document.getElementById('info-box'); if (_ib) _ib.classList.remove('info-visible');
   const _do = document.getElementById('decision-overlay'); if (_do) _do.classList.remove('visible');
@@ -2278,6 +2408,46 @@ function _infoStartTyping(box, txt, text) {
   }, 920);
 }
 
+// ── Vote progress popup ───────────────────────────────────────────────────────
+let _vpVisible = false;
+let _vpNextChange = 8 + Math.random() * 18; // first appearance: 8–26s into session
+
+function _vpUpdate() {
+  const tot = votesDie + votesLive || 1;
+  const diePct = Math.round(votesDie / tot * 100);
+  const livePct = Math.round(votesLive / tot * 100);
+  const bd = document.getElementById('vp-bar-die');
+  const bl = document.getElementById('vp-bar-live');
+  const cd = document.getElementById('vp-count-die');
+  const cl = document.getElementById('vp-count-live');
+  if (bd) bd.style.width = diePct + '%';
+  if (bl) bl.style.width = livePct + '%';
+  if (cd) cd.textContent = votesDie;
+  if (cl) cl.textContent = votesLive;
+}
+
+function tickVotePopup(dt) {
+  if (sessionPhase === 'result' || sessionPhase === 'flash') return;
+  _vpNextChange -= dt;
+  if (_vpNextChange > 0) return;
+
+  const popup = document.getElementById('vote-popup');
+  if (!popup) return;
+
+  if (_vpVisible) {
+    // hide
+    popup.classList.remove('vote-visible');
+    _vpVisible = false;
+    _vpNextChange = 14 + Math.random() * 28; // hidden for 14–42s
+  } else {
+    // show
+    _vpUpdate();
+    popup.classList.add('vote-visible');
+    _vpVisible = true;
+    _vpNextChange = 6 + Math.random() * 10; // visible for 6–16s
+  }
+}
+
 function tickInfoBox() {
   if (_infoIdx >= INFO_ENTRIES.length || sessionElapsed > 180) return;
   if (sessionElapsed < INFO_ENTRIES[_infoIdx].at) return;
@@ -2329,6 +2499,8 @@ let elapsed = 0, frame = 0, camAngle = 0;
   }
   updateSessionTimerEl(_remaining);
   tickInfoBox();
+  tickVotePopup(dt);
+  if (_vpVisible) _vpUpdate();
   broadcastAccum += dt;
   if (broadcastAccum >= 1) { broadcastAccum = 0; broadcastSessionState(); }
 
