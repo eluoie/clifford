@@ -180,12 +180,22 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
   background: radial-gradient(ellipse at center, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.38) 60%, transparent 100%);
 }
 #decision-overlay.visible { opacity: 1; }
+#decision-content {
+  display: flex; flex-direction: column; align-items: center; gap: 1.2vw;
+}
+#decision-prefix {
+  font-size: 1.6vw; font-weight: 200; letter-spacing: 0.22em;
+  font-family: 'Courier New', Courier, monospace;
+  color: rgba(255,255,255,0.55); text-align: center;
+  min-height: 1.8vw;
+}
 #decision-word {
   font-size: 18vw; font-weight: 200; letter-spacing: 0.38em;
   text-transform: uppercase; font-family: 'Courier New', Courier, monospace;
   line-height: 1; text-align: center;
   color: rgba(255,255,255,0.92);
   text-shadow: 0 0 80px rgba(255,255,255,0.25);
+  opacity: 0; transition: opacity 0.9s ease;
 }
 
 
@@ -375,7 +385,7 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
 <div id="info-box"><p id="info-text"></p></div>
 
 <!-- ── Decision overlay ──────────────────────────────────────────────────── -->
-<div id="decision-overlay"><span id="decision-word"></span></div>
+<div id="decision-overlay"><div id="decision-content"><span id="decision-prefix"></span><span id="decision-word"></span></div></div>
 
 <!-- ── White flash ───────────────────────────────────────────────────────── -->
 <div id="white-flash"><canvas id="cloud-noise-canvas"></canvas></div>
@@ -1768,10 +1778,44 @@ function updateSessionTimerEl(remaining) {
 function showDecisionOverlay() {
   const ov = document.getElementById('decision-overlay');
   const dw = document.getElementById('decision-word');
-  if (!ov || !dw) return;
-  dw.textContent = votesDie >= votesLive ? 'PURGE' : 'MERGE';
+  const dp = document.getElementById('decision-prefix');
+  if (!ov || !dw || !dp) return;
+
+  const word = votesDie >= votesLive ? 'PURGE' : 'MERGE';
+  const prefix = 'The fate of this session is to';
+
+  // Reset state
+  dw.textContent = word;
+  dw.style.opacity = '0';
+  dp.textContent = '';
+
   ov.classList.add('visible');
-  setTimeout(() => { ov.classList.remove('visible'); }, 5000);
+
+  // Typing animation — 52ms per character
+  let i = 0;
+  let typeTimer;
+  function typeNext() {
+    i++;
+    dp.textContent = prefix.slice(0, i) + '▌';
+    if (i < prefix.length) {
+      typeTimer = setTimeout(typeNext, 52);
+    } else {
+      // Blink cursor briefly, then reveal the word
+      let blink = 0;
+      const blinkTimer = setInterval(() => {
+        dp.textContent = blink++ % 2 === 0 ? prefix + '▌' : prefix;
+      }, 420);
+      setTimeout(() => {
+        clearInterval(blinkTimer);
+        dp.textContent = prefix;
+        dw.style.opacity = '1';
+      }, 1300);
+    }
+  }
+  typeTimer = setTimeout(typeNext, 52);
+
+  // Hide after full chaos window (10s)
+  setTimeout(() => { ov.classList.remove('visible'); }, 10000);
 }
 
 
