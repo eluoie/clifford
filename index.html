@@ -1840,6 +1840,11 @@ async function runDieAsOne() {
   overlay.appendChild(wordEl);
 
   const waves = [...nameWaves];
+  const _activeWaves = waves.filter(w => !w.dead);
+  const _nw = _activeWaves.length || 1;
+  // Budget 18.5s total so all bursts finish before 0:00 white flash
+  const _burstDur = Math.min(3.0, Math.max(0.9, (18.5 - _nw * 0.15) / _nw));
+  const _burstGap = Math.round(Math.min(200, Math.max(50, 150 * Math.min(1, 4 / _nw))));
   for (const w of waves) {
     if (w.dead) continue;
 
@@ -1854,15 +1859,15 @@ async function runDieAsOne() {
     while (fs > 8 && wordEl.scrollWidth > window.innerWidth * 0.9) { fs -= 2; wordEl.style.fontSize = fs + 'px'; }
     wordEl.style.opacity = '0';
 
-    await purgeBurst(w, wordEl);
-    await new Promise(r => setTimeout(r, 220));
+    await purgeBurst(w, wordEl, _burstDur);
+    await new Promise(r => setTimeout(r, _burstGap));
   }
 
   overlay.remove();
   sessionChaosSpeed = 18;
 }
 
-async function purgeBurst(wave, wordEl) {
+async function purgeBurst(wave, wordEl, duration = 3.0) {
   const N_FINE  = 4500; // small dense particles
   const N_GLOW  = 900;  // large bloom particles
   const srcArr  = wave.cloud.geometry.attributes.position.array;
@@ -1953,7 +1958,7 @@ async function purgeBurst(wave, wordEl) {
     setTimeout(() => { fl.style.transition = 'opacity 0.55s ease'; fl.style.opacity = '0'; }, 60);
   }
 
-  const DURATION = 3.0;
+  const DURATION = duration;
   const DRAG     = 0.974;
   const GRAVITY  = -0.12;
 
@@ -2206,8 +2211,7 @@ async function runLiveAsAll() {
   {
     const CW = cvs.width, CH = cvs.height;
     const ctx2d = cvs.getContext('2d');
-    ctx2d.fillStyle = '#000';
-    ctx2d.fillRect(0, 0, CW, CH);
+    ctx2d.clearRect(0, 0, CW, CH);
 
     // Bounding box from mergedPts (x,y — ignore z)
     let mnX=Infinity, mxX=-Infinity, mnY=Infinity, mxY=-Infinity;
@@ -2246,7 +2250,7 @@ async function runLiveAsAll() {
     'position:fixed;inset:0;z-index:48;pointer-events:none;',
     'display:flex;align-items:center;justify-content:center;',
     'opacity:0;transition:opacity 2.2s ease;',
-    'background:rgba(0,0,0,0.72);backdrop-filter:blur(5px);',
+    'background:radial-gradient(ellipse 60% 60% at center, transparent 0%, rgba(0,0,0,0.52) 100%);',
   ].join('');
   cvs.style.borderRadius = '3px';
   cvs.style.boxShadow = `0 0 120px rgba(${cr},${cg},${cb2},0.45),0 0 240px rgba(${cr},${cg},${cb2},0.18)`;
@@ -2254,6 +2258,7 @@ async function runLiveAsAll() {
   document.body.appendChild(ov);
   requestAnimationFrame(() => requestAnimationFrame(() => { ov.style.opacity = '1'; }));
 
+  const mergeRotStart = Date.now();
   await phase(3500)(p => {
     const ease = p < 0.5 ? 2*p*p : -1+(4-2*p)*p;
     sessionChaosSpeed = Math.max(1.5, 18 - ease*16);
@@ -2266,16 +2271,22 @@ async function runLiveAsAll() {
     merged.cloud.geometry.setDrawRange(0, drawCount);
     merged.cloud2.geometry.setDrawRange(0, Math.floor(drawCount*0.4));
     merged.group.position.set(0,0,0);
+    const rotT = (Date.now() - mergeRotStart) / 1000;
+    merged.group.rotation.y = rotT * 0.45;
+    merged.group.rotation.x = Math.sin(rotT * 0.28) * 0.22;
   });
 
-  // ── Phase 6 (16–20 s): settled — overlay holds, attractor glows ──────────
+  // ── Phase 6 (16–19.5 s): settled — overlay holds, attractor glows ─────────
   merged.cloud.geometry.setDrawRange(0, MAX_PTS);
   merged.cloud2.geometry.setDrawRange(0, MAX_PTS);
   merged.mat.opacity = 0.75; merged.mat2.opacity = 0.22;
   liveAsAllShake = 0; sessionChaosSpeed = 1.5;
 
-  await phase(4500)(p => {
+  await phase(3500)(p => {
     merged.orbMat.opacity = Math.min(0.13, p * 0.13);
+    const rotT = (Date.now() - mergeRotStart) / 1000;
+    merged.group.rotation.y = rotT * 0.45;
+    merged.group.rotation.x = Math.sin(rotT * 0.28) * 0.22;
   });
 
   ov.remove();
