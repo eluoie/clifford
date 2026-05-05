@@ -556,22 +556,37 @@ body {
 // ── Audio Engine ──────────────────────────────────────────────────────────────
 const _audio = (() => {
   let ctx = null, master = null, reverb = null, dry = null, ambStarted = false;
+  const _tones = new Map(); // wave.id → { osc, lfo, g }
 
-  // Major pentatonic of F, two octaves — F G A C D (warm, open, jazzy)
-  // Semitones from F3 = 174.61 Hz
-  const PENTA = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21];
-  function stToHz(st) { return 174.61 * Math.pow(2, st / 12); }
-  function hashToHz(hash) { return stToHz(PENTA[Math.abs(hash) % PENTA.length]); }
+  // Pure harmonic series rooted at 528 Hz — natural ratios, crystalline
+  // Maps hue (0-360) across the series like visible light → frequency
+  const LIGHT_FREQS = [
+    264,   // C4   — soft foundation
+    330,   // E4   — warm harmonic
+    396,   // G4   — perfect fifth
+    440,   // A4   — centred clarity
+    528,   // C5   — luminous centre
+    660,   // E5   — bright fifth
+    792,   // G5   — airy
+    880,   // A5   — shimmering
+    1056,  // C6   — near-light
+    1320,  // E6   — luminous edge
+  ];
+  function hueToFreq(hue) {
+    const idx = Math.round((hue / 360) * (LIGHT_FREQS.length - 1));
+    return LIGHT_FREQS[Math.max(0, Math.min(LIGHT_FREQS.length - 1, idx))];
+  }
+  function hashToFreq(hash) { return LIGHT_FREQS[Math.abs(hash) % LIGHT_FREQS.length]; }
 
-  // Short, warm room reverb — not cavernous
+  // Long, spacious shimmer reverb — like light reflecting in an infinite room
   function makeReverb(c) {
     const conv = c.createConvolver();
-    const sr = c.sampleRate, len = sr * 2.2;
+    const sr = c.sampleRate, len = Math.floor(sr * 5.5);
     const buf = c.createBuffer(2, len, sr);
     for (let ch = 0; ch < 2; ch++) {
       const d = buf.getChannelData(ch);
       for (let i = 0; i < len; i++)
-        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.0);
+        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 1.6) * 0.45;
     }
     conv.buffer = buf;
     return conv;
@@ -581,21 +596,13 @@ const _audio = (() => {
     if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
     ctx = new (window.AudioContext || window.webkitAudioContext)();
 
-    // Soft warmth: gentle waveshaper saturation
-    const ws = ctx.createWaveShaper();
-    const curve = new Float32Array(256);
-    for (let i = 0; i < 256; i++) {
-      const x = (i * 2) / 256 - 1;
-      curve[i] = x / (1 + 3 * Math.abs(x)); // soft clip
-    }
-    ws.curve = curve; ws.oversample = '2x';
-
-    master = ctx.createGain(); master.gain.value = 0.68;
-    master.connect(ws); ws.connect(ctx.destination);
+    // No saturation — pure signal path
+    master = ctx.createGain(); master.gain.value = 0.52;
+    master.connect(ctx.destination);
 
     reverb = makeReverb(ctx);
-    const revG = ctx.createGain(); revG.gain.value = 0.38;
-    dry = ctx.createGain(); dry.gain.value = 0.62;
+    const revG = ctx.createGain(); revG.gain.value = 0.62; // spacious reverb mix
+    dry = ctx.createGain(); dry.gain.value = 0.38;
     reverb.connect(revG); revG.connect(master);
     dry.connect(master);
 
@@ -607,104 +614,120 @@ const _audio = (() => {
     ambStarted = true;
     const now = ctx.currentTime;
 
-    // Fmaj9 voicing: F3 A3 C4 E4 G4 — warm pad
-    // Chorus pairs keep detune ≤2 cents so beat frequency stays <0.2 Hz
-    const voices = [
-      [174.61,  0,  0.048], // F3
-      [174.61, -2,  0.030], // F3 chorus (beat: ~0.20 Hz — imperceptible)
-      [220.00,  1,  0.036], // A3
-      [261.63,  0,  0.030], // C4
-      [329.63,  1,  0.020], // E4
-      [329.63, -1,  0.014], // E4 chorus (beat: ~0.19 Hz)
-      [392.00,  0,  0.013], // G4
+    // Three barely-there drones — like background photon hiss
+    // Pure harmonics of 528: C5, G5, C6
+    const drones = [
+      [528,  0,   0.016],
+      [792,  1.2, 0.009],
+      [1056, -0.8, 0.005],
     ];
-
-    // Shared lowpass — keeps everything warm and rolled off
-    const lpf = ctx.createBiquadFilter();
-    lpf.type = 'lowpass'; lpf.frequency.value = 1800; lpf.Q.value = 0.4;
-    lpf.connect(reverb); lpf.connect(dry);
-
-    voices.forEach(([freq, detune, peak], i) => {
+    drones.forEach(([freq, detune, peak], i) => {
       const osc = ctx.createOscillator();
-      osc.type = 'sine';
-      osc.frequency.value = freq; osc.detune.value = detune;
-
+      osc.type = 'sine'; osc.frequency.value = freq; osc.detune.value = detune;
       const g = ctx.createGain();
-      // Very gentle LFO — barely perceptible breathe
+      // Ultra-slow breath: barely perceptible swell
       const lfo = ctx.createOscillator(); lfo.type = 'sine';
-      lfo.frequency.value = 0.018 + i * 0.004;
-      const lfoG = ctx.createGain(); lfoG.gain.value = peak * 0.04;
+      lfo.frequency.value = 0.007 + i * 0.003;
+      const lfoG = ctx.createGain(); lfoG.gain.value = peak * 0.22;
       lfo.connect(lfoG); lfoG.connect(g.gain);
-
       g.gain.setValueAtTime(0, now);
-      g.gain.linearRampToValueAtTime(peak, now + 6 + i * 2.0);
-
-      osc.connect(g); g.connect(lpf);
+      g.gain.linearRampToValueAtTime(peak, now + 14 + i * 5);
+      osc.connect(g); g.connect(reverb); g.connect(dry);
       osc.start(now); lfo.start(now);
     });
   }
 
+  // Each live attractor gets its own sustained light-tone
+  function startTone(wave) {
+    if (!ctx || _tones.has(wave.id)) return;
+    const hsl = {}; wave.sig.color.getHSL(hsl);
+    const freq = hueToFreq(hsl.h * 360);
+    const now = ctx.currentTime;
+
+    const osc = ctx.createOscillator(); osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, now);
+
+    // Tiny shimmer LFO — like light scintillation
+    const lfo = ctx.createOscillator(); lfo.type = 'sine';
+    lfo.frequency.value = 0.05 + Math.random() * 0.10;
+    const lfoG = ctx.createGain(); lfoG.gain.value = freq * 0.004;
+    lfo.connect(lfoG); lfoG.connect(osc.frequency);
+
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(0.028, now + 3.5); // very slow fade in
+
+    osc.connect(g); g.connect(reverb); g.connect(dry);
+    osc.start(now); lfo.start(now);
+    _tones.set(wave.id, { osc, lfo, g });
+  }
+
+  function stopTone(wave, fadeTime = 2.5) {
+    const t = _tones.get(wave.id);
+    if (!t || !ctx) return;
+    _tones.delete(wave.id);
+    const now = ctx.currentTime;
+    t.g.gain.cancelScheduledValues(now);
+    t.g.gain.setValueAtTime(t.g.gain.value, now);
+    t.g.gain.linearRampToValueAtTime(0, now + fadeTime);
+    setTimeout(() => { try { t.osc.stop(); t.lfo.stop(); } catch(e) {} }, (fadeTime + 0.1) * 1000);
+  }
+
+  function stopAllTones() {
+    _tones.forEach((t, id) => {
+      if (!ctx) return;
+      const now = ctx.currentTime;
+      t.g.gain.cancelScheduledValues(now);
+      t.g.gain.setValueAtTime(t.g.gain.value, now);
+      t.g.gain.linearRampToValueAtTime(0, now + 1.2);
+      setTimeout(() => { try { t.osc.stop(); t.lfo.stop(); } catch(e) {} }, 1400);
+    });
+    _tones.clear();
+  }
+
+  // Crystalline ping — like light touching glass
   function playSpawn(hash) {
     if (!ctx) return;
     if (ctx.state === 'suspended') ctx.resume();
-    const freq = hashToHz(hash), now = ctx.currentTime + 0.05;
-
-    // Rhodes-like warm pluck: 3 detuned sines for chorus, piano-style envelope
-    [0, 8, -6].forEach((cents, i) => {
-      const o = ctx.createOscillator(); o.type = 'sine';
-      o.frequency.value = freq; o.detune.value = cents;
-
-      // 2nd harmonic for body
-      const o2 = ctx.createOscillator(); o2.type = 'sine';
-      o2.frequency.value = freq * 2; o2.detune.value = cents;
-
-      const g  = ctx.createGain();
-      const g2 = ctx.createGain();
-      const baseAmp = [0.13, 0.07, 0.06][i];
-
-      // Fast attack → quick decay to sustain → long tail (like a Rhodes key)
+    const freq = hashToFreq(hash) * 2; // upper octave for chime feel
+    const now = ctx.currentTime + 0.04;
+    // Fundamental + pure 3rd harmonic, no detune
+    [freq, freq * 3.0].forEach((f, i) => {
+      const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f;
+      const g = ctx.createGain();
+      const amp = i === 0 ? 0.09 : 0.025;
       g.gain.setValueAtTime(0, now);
-      g.gain.linearRampToValueAtTime(baseAmp, now + 0.014);
-      g.gain.exponentialRampToValueAtTime(baseAmp * 0.45, now + 0.28);
-      g.gain.exponentialRampToValueAtTime(0.0001, now + 3.2);
-
-      g2.gain.setValueAtTime(0, now);
-      g2.gain.linearRampToValueAtTime(baseAmp * 0.3, now + 0.014);
-      g2.gain.exponentialRampToValueAtTime(0.0001, now + 1.1);
-
-      o.connect(g);   g.connect(reverb);  g.connect(dry);
-      o2.connect(g2); g2.connect(reverb);
-      o.start(now); o.stop(now + 3.4);
-      o2.start(now); o2.stop(now + 1.3);
+      g.gain.linearRampToValueAtTime(amp, now + 0.008); // instant attack — ping
+      g.gain.exponentialRampToValueAtTime(amp * 0.3, now + 0.18);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + 2.8);
+      o.connect(g); g.connect(reverb); g.connect(dry);
+      o.start(now); o.stop(now + 3.0);
     });
   }
 
+  // Interference — two light-frequencies meeting
   function playClash(hashA, hashB) {
     if (!ctx) return;
     if (ctx.state === 'suspended') ctx.resume();
-    const fA = hashToHz(hashA), fB = hashToHz(hashB);
-    // Major 7th chord voicing: lower + major 3rd + perfect 5th
-    const fLow = Math.min(fA, fB);
-    const notes = [fLow, fLow * Math.pow(2, 4/12), fLow * Math.pow(2, 7/12), Math.max(fA, fB)];
+    const fA = hashToFreq(hashA), fB = hashToFreq(hashB);
     const now = ctx.currentTime;
-    notes.forEach((freq, i) => {
+    [fA, fB, (fA + fB) / 2].forEach((freq, i) => {
       const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = freq;
       const g = ctx.createGain();
-      const amp = [0.09, 0.08, 0.07, 0.06][i];
-      // Soft attack, warm long sustain
+      const amp = [0.06, 0.06, 0.04][i];
       g.gain.setValueAtTime(0, now);
-      g.gain.linearRampToValueAtTime(amp, now + 0.07);
-      g.gain.exponentialRampToValueAtTime(amp * 0.5, now + 0.8);
-      g.gain.exponentialRampToValueAtTime(0.0001, now + 3.0);
+      g.gain.linearRampToValueAtTime(amp, now + 0.05);
+      g.gain.exponentialRampToValueAtTime(amp * 0.4, now + 0.6);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + 3.5);
       o.connect(g); g.connect(reverb); g.connect(dry);
-      o.start(now); o.stop(now + 3.2);
+      o.start(now); o.stop(now + 3.7);
     });
   }
 
   document.addEventListener('click',   init, false);
   document.addEventListener('keydown', init, { once: true });
 
-  return { init, playSpawn, playClash };
+  return { init, playSpawn, playClash, startTone, stopTone, stopAllTones };
 })();
 
 // ── Renderer ──────────────────────────────────────────────────────────────────
@@ -1786,6 +1809,7 @@ async function spawnName(name) {
   nameWaves.push(wave);
   _audio.init();
   _audio.playSpawn(wave.sig.hash);
+  _audio.startTone(wave);
   
 
   // Overlay runs AFTER — wave already visible behind it
@@ -1820,6 +1844,7 @@ async function spawnName(name) {
 
 // ── Clear all ─────────────────────────────────────────────────────────────────
 function clearAll() {
+  _audio.stopAllTones();
   nameWaves.forEach(w => w.destroy()); nameWaves = [];
   arcs.forEach(a => a.destroy()); arcs = [];
   particleFlows.forEach(pf => pf.destroy()); particleFlows = [];
@@ -1998,6 +2023,7 @@ async function purgeBurst(wave, wordEl, duration = 3.0) {
   });
 
   // Kill original wave immediately
+  _audio.stopTone(wave, 1.0);
   wave.dead = true;
 
   // Screen flash at detonation
@@ -2240,7 +2266,7 @@ async function runLiveAsAll() {
       w.mat.opacity    = fadeOut;
       w.mat2.opacity   = fadeOut * 0.85;
       w.orbMat.opacity = fadeOut * 0.13;
-      if (fadeOut < 0.005) w.dead = true;
+      if (fadeOut < 0.005 && !w.dead) { _audio.stopTone(w, 0.5); w.dead = true; }
     });
   });
   waves.forEach(w => { w.dead = true; });
