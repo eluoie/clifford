@@ -668,6 +668,39 @@ const _audio = (() => {
     });
   }
 
+  // Try to auto-start: call init immediately, then retry until AudioContext resumes.
+  // Browsers may allow this for pages loaded via navigation or on kiosk displays.
+  function _tryResume() {
+    if (!ctx) {
+      try { init(); } catch(e) {}
+    }
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+      // Unlock trick: play a silent one-sample buffer
+      try {
+        const silent = ctx.createBuffer(1, 1, 22050);
+        const src = ctx.createBufferSource();
+        src.buffer = silent;
+        src.connect(ctx.destination);
+        src.start(0);
+      } catch(e) {}
+    }
+  }
+
+  // Attempt immediately and on page visibility/focus changes
+  window.addEventListener('load',             _tryResume);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) _tryResume(); });
+  window.addEventListener('focus',            _tryResume);
+
+  // Retry every 800ms for first 12s — handles browsers that unlock after a moment
+  let _audioRetries = 15;
+  const _audioRetryIv = setInterval(() => {
+    if (ctx && ctx.state === 'running') { clearInterval(_audioRetryIv); return; }
+    _tryResume();
+    if (--_audioRetries <= 0) clearInterval(_audioRetryIv);
+  }, 800);
+
+  // Keep user-gesture fallback for strict browsers
   document.addEventListener('click',   init, false);
   document.addEventListener('keydown', init, { once: true });
 
