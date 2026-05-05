@@ -1791,14 +1791,14 @@ function showDecisionOverlay() {
 
   ov.classList.add('visible');
 
-  // Typing animation — 52ms per character
+  // Typing animation — human typing speed with natural variation
   let i = 0;
   let typeTimer;
   function typeNext() {
     i++;
     dp.textContent = prefix.slice(0, i) + '▌';
     if (i < prefix.length) {
-      typeTimer = setTimeout(typeNext, 52);
+      typeTimer = setTimeout(typeNext, 110 + Math.random() * 80);
     } else {
       // Blink cursor briefly, then reveal the word
       let blink = 0;
@@ -1812,7 +1812,7 @@ function showDecisionOverlay() {
       }, 1300);
     }
   }
-  typeTimer = setTimeout(typeNext, 52);
+  typeTimer = setTimeout(typeNext, 110 + Math.random() * 80);
 
   // Hide after full chaos window (10s)
   setTimeout(() => { ov.classList.remove('visible'); }, 10000);
@@ -2518,98 +2518,68 @@ let elapsed = 0, frame = 0, camAngle = 0;
 
 
 // ── AI Glitch Terminal ────────────────────────────────────────────────────────
-const _GT_TITLES = [
-  'clifford.sys', 'attractor.js', 'universe.log', 'entropy.sh', 'chaos.py',
-];
-
-const _GT_SNIPPETS = [
-  // Param analysis
-  w => `<span class="t-comment">// analyzing: ${w || 'UNKNOWN'}</span>
-<span class="t-prompt">$</span> sample_attractor --word "${w || '???'}"
-<span class="t-dim">params  a=${(Math.random()*3-1.5).toFixed(4)}</span>
-<span class="t-dim">        b=${(Math.random()*3-1.5).toFixed(4)}</span>
-<span class="t-dim">        c=${(Math.random()*3-1.5).toFixed(4)}</span>
-<span class="t-dim">        d=${(Math.random()*3-1.5).toFixed(4)}</span>
-lyapunov_exp → <span class="t-cursor">▌</span>`,
-
-  // Entropy scan
-  () => `<span class="t-prompt">$</span> entropy_scan --live
-scanning phase space...
-[██████████░░░░░░] ${Math.floor(Math.random()*30+60)}%
-anomalies detected: ${Math.floor(Math.random()*4)}
-<span class="t-comment">// bifurcation near boundary</span>
-<span class="t-cursor">▌</span>`,
-
-  // Vote tally
-  () => {
-    const d = votesDie, l = votesLive, t = d + l || 1;
-    return `<span class="t-prompt">$</span> query_consensus --realtime
-votes.purge  = ${d}  (${Math.round(d/t*100)}%)
-votes.merge  = ${l}  (${Math.round(l/t*100)}%)
-<span class="t-comment">// ${d > l ? 'singularity imminent' : l > d ? 'transcendence likely' : 'equilibrium state'}</span>
-<span class="t-cursor">▌</span>`;
-  },
-
-  // System warning
-  () => `<span class="t-comment">// WARN: strange attractor unstable</span>
-<span class="t-prompt">$</span> stabilize --force
-<span class="t-dim">[ ok ] re-seeding RNG</span>
-<span class="t-dim">[ ok ] orbit recalculated</span>
-[ !! ] divergence persists
-<span class="t-cursor">▌</span>`,
-
-  // Iteration log
-  () => `<span class="t-prompt">$</span> run_clifford --iter 70000
-x[n+1] = sin(a·y) + c·cos(a·x)
-y[n+1] = sin(b·x) + d·cos(b·y)
-<span class="t-dim">pts rendered : ${(70000).toLocaleString()}</span>
-<span class="t-dim">frame        : ${frame}</span>
-<span class="t-cursor">▌</span>`,
-
-  // Participant trace
-  w => `<span class="t-prompt">$</span> trace_entity --id "${w || 'VOID'}"
-<span class="t-dim">djb2_hash     : 0x${Math.floor(Math.random()*0xFFFFFF).toString(16).toUpperCase().padStart(6,'0')}</span>
-<span class="t-dim">hue           : ${Math.floor(Math.random()*360)}°</span>
-<span class="t-dim">orbit_phase   : ${(Math.random()*6.28).toFixed(3)} rad</span>
-fate_locked   : <span class="t-comment">pending</span><span class="t-cursor">▌</span>`,
-];
-
-let _gtNextTime  = 45 + Math.random() * 60; // first glitch after 45-105s
-let _gtVisible   = false;
+let _gtLines    = null;   // raw source lines fetched once
+let _gtNextTime = 45 + Math.random() * 60;
+let _gtVisible  = false;
 let _gtHideTimer = null;
 
-function _gtPickWord() {
-  const alive = nameWaves.filter(w => !w.dead);
-  return alive.length ? alive[Math.floor(Math.random() * alive.length)].name : null;
+// Fetch own source once, split into lines, strip blank lines
+fetch(location.href)
+  .then(r => r.text())
+  .then(txt => {
+    _gtLines = txt.split('\n').filter(l => l.trim().length > 1);
+  })
+  .catch(() => { _gtLines = []; });
+
+function _gtEscape(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function _gtColorLine(raw) {
+  const s = _gtEscape(raw);
+  const t = raw.trim();
+  // Comments
+  if (t.startsWith('//') || t.startsWith('*') || t.startsWith('/*'))
+    return `<span class="t-comment">${s}</span>`;
+  // HTML tags / CSS blocks
+  if (t.startsWith('<') || t.startsWith('#') || t.startsWith('.'))
+    return `<span class="t-dim">${s}</span>`;
+  // Full-brightness: function/class/const/let keywords
+  if (/^(function|class|const |let |var |async |return|if |for |while )/.test(t))
+    return s;
+  // Default: slightly dimmed
+  return `<span class="t-dim">${s}</span>`;
 }
 
 function _gtShow() {
-  const el   = document.getElementById('glitch-terminal');
-  const body = document.getElementById('gt-body');
+  const el    = document.getElementById('glitch-terminal');
+  const body  = document.getElementById('gt-body');
   const title = document.getElementById('gt-title');
-  if (!el || !body) return;
+  if (!el || !body || !_gtLines || _gtLines.length < 20) return;
 
-  // Pick random snippet
-  const snippet = _GT_SNIPPETS[Math.floor(Math.random() * _GT_SNIPPETS.length)];
-  const word = _gtPickWord();
-  body.innerHTML = snippet(word);
+  // Pick a random block of 12-16 consecutive lines
+  const blockLen = 12 + Math.floor(Math.random() * 5);
+  const maxStart = _gtLines.length - blockLen;
+  const start    = Math.floor(Math.random() * maxStart);
+  const lines    = _gtLines.slice(start, start + blockLen);
 
-  // Random title
-  title.textContent = _GT_TITLES[Math.floor(Math.random() * _GT_TITLES.length)];
+  // Truncate long lines to 52 chars
+  const rendered = lines
+    .map(l => _gtColorLine(l.slice(0, 52)))
+    .join('\n');
 
-  // Random position — avoid dead center, favour edges/corners
-  const margin = 32;
-  const w = 380 + margin * 2;
-  const h = 180;  // approx height
+  body.innerHTML = rendered + '\n<span class="t-cursor">▌</span>';
+
+  // Title shows approximate line number
+  title.textContent = `index.html  :${start + 1}`;
+
+  // Position in a corner
+  const margin = 32, w = 380 + margin * 2, h = 240;
   const zones = [
-    // bottom-right (avoid vote popup at bottom-left)
     { l: innerWidth - w - margin, t: innerHeight - h - 80 },
-    // top-right
     { l: innerWidth - w - margin, t: margin + 60 },
-    // top-left
-    { l: margin, t: margin + 60 },
-    // bottom-left (only if vote popup not visible)
-    { l: margin, t: innerHeight - h - 80 },
+    { l: margin,                  t: margin + 60 },
+    { l: margin,                  t: innerHeight - h - 80 },
   ];
   const zone = zones[Math.floor(Math.random() * zones.length)];
   el.style.left = Math.max(margin, Math.min(innerWidth - w, zone.l)) + 'px';
@@ -2618,9 +2588,8 @@ function _gtShow() {
   el.classList.add('gt-visible');
   _gtVisible = true;
 
-  // Auto-hide after 4–7 seconds
   if (_gtHideTimer) clearTimeout(_gtHideTimer);
-  _gtHideTimer = setTimeout(_gtHide, 4000 + Math.random() * 3000);
+  _gtHideTimer = setTimeout(_gtHide, 5000 + Math.random() * 4000);
 }
 
 function _gtHide() {
@@ -2635,7 +2604,7 @@ function tickGlitch(dt) {
   _gtAccum += dt;
   if (_gtAccum < _gtNextTime) return;
   _gtAccum = 0;
-  _gtNextTime = 55 + Math.random() * 75; // reappear every 55–130s
+  _gtNextTime = 55 + Math.random() * 75;
   if (!_gtVisible) _gtShow();
 }
 
