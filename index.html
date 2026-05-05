@@ -556,26 +556,11 @@ body {
 // ── Audio Engine ──────────────────────────────────────────────────────────────
 const _audio = (() => {
   let ctx = null, master = null, reverb = null, dry = null;
-  const _tones = new Map(); // wave.id → { osc, lfo, g }
-
   // Pure harmonic series rooted at 528 Hz — natural ratios, crystalline
   // Maps hue (0-360) across the series like visible light → frequency
   const LIGHT_FREQS = [
-    264,   // C4   — soft foundation
-    330,   // E4   — warm harmonic
-    396,   // G4   — perfect fifth
-    440,   // A4   — centred clarity
-    528,   // C5   — luminous centre
-    660,   // E5   — bright fifth
-    792,   // G5   — airy
-    880,   // A5   — shimmering
-    1056,  // C6   — near-light
-    1320,  // E6   — luminous edge
+    264, 330, 396, 440, 528, 660, 792, 880, 1056, 1320,
   ];
-  function hueToFreq(hue) {
-    const idx = Math.round((hue / 360) * (LIGHT_FREQS.length - 1));
-    return LIGHT_FREQS[Math.max(0, Math.min(LIGHT_FREQS.length - 1, idx))];
-  }
   function hashToFreq(hash) { return LIGHT_FREQS[Math.abs(hash) % LIGHT_FREQS.length]; }
 
   // Long, spacious shimmer reverb — like light reflecting in an infinite room
@@ -606,54 +591,6 @@ const _audio = (() => {
     reverb.connect(revG); revG.connect(master);
     dry.connect(master);
 
-  }
-
-  // Each live attractor gets its own sustained light-tone
-  function startTone(wave) {
-    if (!ctx || _tones.has(wave.id)) return;
-    const hsl = {}; wave.sig.color.getHSL(hsl);
-    const freq = hueToFreq(hsl.h * 360);
-    const now = ctx.currentTime;
-
-    const osc = ctx.createOscillator(); osc.type = 'sine';
-    osc.frequency.setValueAtTime(freq, now);
-
-    // Tiny shimmer LFO — like light scintillation
-    const lfo = ctx.createOscillator(); lfo.type = 'sine';
-    lfo.frequency.value = 0.05 + Math.random() * 0.10;
-    const lfoG = ctx.createGain(); lfoG.gain.value = freq * 0.004;
-    lfo.connect(lfoG); lfoG.connect(osc.frequency);
-
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(0, now);
-    g.gain.linearRampToValueAtTime(0.028, now + 3.5); // very slow fade in
-
-    osc.connect(g); g.connect(reverb); g.connect(dry);
-    osc.start(now); lfo.start(now);
-    _tones.set(wave.id, { osc, lfo, g });
-  }
-
-  function stopTone(wave, fadeTime = 2.5) {
-    const t = _tones.get(wave.id);
-    if (!t || !ctx) return;
-    _tones.delete(wave.id);
-    const now = ctx.currentTime;
-    t.g.gain.cancelScheduledValues(now);
-    t.g.gain.setValueAtTime(t.g.gain.value, now);
-    t.g.gain.linearRampToValueAtTime(0, now + fadeTime);
-    setTimeout(() => { try { t.osc.stop(); t.lfo.stop(); } catch(e) {} }, (fadeTime + 0.1) * 1000);
-  }
-
-  function stopAllTones() {
-    _tones.forEach((t, id) => {
-      if (!ctx) return;
-      const now = ctx.currentTime;
-      t.g.gain.cancelScheduledValues(now);
-      t.g.gain.setValueAtTime(t.g.gain.value, now);
-      t.g.gain.linearRampToValueAtTime(0, now + 1.2);
-      setTimeout(() => { try { t.osc.stop(); t.lfo.stop(); } catch(e) {} }, 1400);
-    });
-    _tones.clear();
   }
 
   // Crystalline ping — like light touching glass
@@ -698,7 +635,7 @@ const _audio = (() => {
   document.addEventListener('click',   init, false);
   document.addEventListener('keydown', init, { once: true });
 
-  return { init, playSpawn, playClash, startTone, stopTone, stopAllTones };
+  return { init, playSpawn, playClash };
 })();
 
 // ── Renderer ──────────────────────────────────────────────────────────────────
@@ -1780,7 +1717,6 @@ async function spawnName(name) {
   nameWaves.push(wave);
   _audio.init();
   _audio.playSpawn(wave.sig.hash);
-  _audio.startTone(wave);
   
 
   // Overlay runs AFTER — wave already visible behind it
@@ -1815,7 +1751,6 @@ async function spawnName(name) {
 
 // ── Clear all ─────────────────────────────────────────────────────────────────
 function clearAll() {
-  _audio.stopAllTones();
   nameWaves.forEach(w => w.destroy()); nameWaves = [];
   arcs.forEach(a => a.destroy()); arcs = [];
   particleFlows.forEach(pf => pf.destroy()); particleFlows = [];
@@ -1994,7 +1929,6 @@ async function purgeBurst(wave, wordEl, duration = 3.0) {
   });
 
   // Kill original wave immediately
-  _audio.stopTone(wave, 1.0);
   wave.dead = true;
 
   // Screen flash at detonation
@@ -2237,7 +2171,7 @@ async function runLiveAsAll() {
       w.mat.opacity    = fadeOut;
       w.mat2.opacity   = fadeOut * 0.85;
       w.orbMat.opacity = fadeOut * 0.13;
-      if (fadeOut < 0.005 && !w.dead) { _audio.stopTone(w, 0.5); w.dead = true; }
+      if (fadeOut < 0.005) w.dead = true;
     });
   });
   waves.forEach(w => { w.dead = true; });
