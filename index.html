@@ -308,21 +308,12 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
   box-shadow: 0 16px 48px rgba(0,0,0,0.8), 0 0 0 1px rgba(51,255,102,0.08);
 }
 .terminal-bar {
-  background: #111811;
-  padding: 8px 12px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  border-bottom: 1px solid rgba(255,255,255,0.04);
+  padding: 8px 18px 4px;
+  border-bottom: 1px solid rgba(51,255,102,0.10);
 }
-.t-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-.t-dot.red    { background: #ff5f57; }
-.t-dot.yellow { background: #febc2e; }
-.t-dot.green  { background: #28c840; }
 .terminal-title {
-  flex: 1; text-align: center;
   font-size: 10px; font-family: 'Courier New', monospace;
-  color: rgba(255,255,255,0.22); letter-spacing: 0.06em;
+  color: rgba(51,255,102,0.35); letter-spacing: 0.10em;
 }
 .terminal-body { padding: 14px 18px; }
 .terminal-body pre { margin: 0; color: #33ff66; font-size: 11px; white-space: pre-wrap; }
@@ -371,12 +362,10 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
     <div class="vp-item">
       <div class="vp-label">PURGE</div>
       <div class="vp-track"><div class="vp-bar" id="vp-bar-die"></div></div>
-      <div class="vp-count" id="vp-count-die">0</div>
     </div>
     <div class="vp-item">
       <div class="vp-label">MERGE</div>
       <div class="vp-track"><div class="vp-bar" id="vp-bar-live"></div></div>
-      <div class="vp-count" id="vp-count-live">0</div>
     </div>
   </div>
 </div>
@@ -1794,6 +1783,7 @@ function broadcastSessionState() {
 }
 
 function handlePhaseChange(from, to) {
+  if (to === 'chaos') { _gtHide(); }
   if (to === 'lockout' || to === 'chaos') {
     updateSessionTimerEl(300 - sessionElapsed);
     if (to === 'chaos') showDecisionOverlay();
@@ -2410,20 +2400,12 @@ function _vpUpdate() {
   const tot = votesDie + votesLive;
   const bd = document.getElementById('vp-bar-die');
   const bl = document.getElementById('vp-bar-live');
-  const cd = document.getElementById('vp-count-die');
-  const cl = document.getElementById('vp-count-live');
   if (tot === 0) {
     if (bd) bd.style.width = '50%';
     if (bl) bl.style.width = '50%';
-    if (cd) cd.textContent = '0';
-    if (cl) cl.textContent = '0';
   } else {
-    const diePct  = Math.max(4, Math.round(votesDie  / tot * 100));
-    const livePct = Math.max(4, Math.round(votesLive / tot * 100));
-    if (bd) bd.style.width = diePct  + '%';
-    if (bl) bl.style.width = livePct + '%';
-    if (cd) cd.textContent = votesDie;
-    if (cl) cl.textContent = votesLive;
+    if (bd) bd.style.width = Math.max(4, Math.round(votesDie  / tot * 100)) + '%';
+    if (bl) bl.style.width = Math.max(4, Math.round(votesLive / tot * 100)) + '%';
   }
 }
 
@@ -2598,7 +2580,7 @@ function _gtHide() {
 
 let _gtAccum = 0;
 function tickGlitch(dt) {
-  if (sessionPhase === 'result' || sessionPhase === 'flash') return;
+  if (sessionPhase === 'chaos' || sessionPhase === 'result' || sessionPhase === 'flash') return;
   _gtAccum += dt;
   if (_gtAccum < _gtNextTime) return;
   _gtAccum = 0;
@@ -2671,9 +2653,6 @@ window.addEventListener('resize', () => {
 <div id="glitch-terminal">
   <div class="code-terminal">
     <div class="terminal-bar">
-      <span class="t-dot red"></span>
-      <span class="t-dot yellow"></span>
-      <span class="t-dot green"></span>
       <span class="terminal-title" id="gt-title">clifford.sys</span>
     </div>
     <div class="terminal-body">
