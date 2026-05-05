@@ -144,6 +144,7 @@ body { background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvet
 }
 #qr-wrap {
   display: flex; flex-direction: column; align-items: center; gap: 10px;
+  transition: opacity 0.8s ease; opacity: 1;
 }
 #qr-canvas img {
   display: block;
@@ -1783,7 +1784,11 @@ function broadcastSessionState() {
 }
 
 function handlePhaseChange(from, to) {
-  if (to === 'chaos') { _gtHide(); }
+  if (to === 'chaos') {
+    _gtHide();
+    const qr = document.getElementById('qr-wrap');
+    if (qr) qr.style.opacity = '0';
+  }
   if (to === 'lockout' || to === 'chaos') {
     updateSessionTimerEl(300 - sessionElapsed);
     if (to === 'chaos') showDecisionOverlay();
@@ -2263,6 +2268,8 @@ function doWhiteFlash() {
 }
 
 function resetSession() {
+  const qr = document.getElementById('qr-wrap');
+  if (qr) qr.style.opacity = '1';
   // Pull survivor out of nameWaves BEFORE clearAll so its Three.js objects survive
   const sw = survivorWave;
   survivorWave = null;
